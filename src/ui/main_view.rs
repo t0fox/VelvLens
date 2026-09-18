@@ -224,26 +224,31 @@ pub fn show(
             if report.is_none() {
                 theme::draw_network_backdrop(ui);
             }
-            if let Some(report) = report {
-                if let Some(index) = *selected {
-                    if let Some(config) = report.configs.get(index) {
-                        let content_width = ui.available_width().min(920.0);
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(content_width, ui.available_height()),
-                            egui::Layout::top_down(egui::Align::Min),
-                            |ui| details::show(ui, config, show_sensitive, qr),
-                        );
-                        ui.add_space(12.0);
-                        egui::CollapsingHeader::new("Decode pipeline")
-                            .default_open(false)
-                            .show(ui, |ui| inspector::show_stages(ui, report));
+            egui::ScrollArea::vertical()
+                .id_salt("workspace-inspector")
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    if let Some(report) = report {
+                        if let Some(index) = *selected {
+                            if let Some(config) = report.configs.get(index) {
+                                let content_width = ui.available_width().min(920.0);
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(content_width, ui.available_height()),
+                                    egui::Layout::top_down(egui::Align::Min),
+                                    |ui| details::show(ui, config, show_sensitive, qr),
+                                );
+                                ui.add_space(12.0);
+                                egui::CollapsingHeader::new("Decode pipeline")
+                                    .default_open(false)
+                                    .show(ui, |ui| inspector::show_stages(ui, report));
+                            }
+                        } else {
+                            inspector::show(ui, report);
+                        }
+                    } else {
+                        empty_state(ui, status, running);
                     }
-                } else {
-                    inspector::show(ui, report);
-                }
-            } else {
-                empty_state(ui, status, running);
-            }
+                });
         });
 
     if let Some(matrix) = qr.as_ref() {
@@ -290,13 +295,7 @@ fn filter_button(
     } else {
         theme::MUTED
     };
-    let width = match label {
-        "All" => 76.0,
-        "VLESS" | "VMess" | "Trojan" | "TUIC" => 92.0,
-        "Hysteria2" => 112.0,
-        "Shadowsocks" => 128.0,
-        _ => 96.0,
-    };
+    let width = (format!("{label}  {count}").chars().count() as f32 * 6.2 + 28.0).max(62.0);
     let response = ui.add_sized(
         [width, 30.0],
         egui::Button::new(
