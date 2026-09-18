@@ -26,8 +26,10 @@ impl TestServer {
         let address = listener.local_addr().unwrap().to_string();
         let (shutdown, mut stop) = oneshot::channel();
         let encoded = STANDARD.encode("trojan://synthetic-password@nested.example:443");
-        let wrapped =
-            STANDARD.encode("vless://12345678-1234-1234-1234-123456789abc@wrapped.example:443");
+        let wrapped = STANDARD.encode(
+            "vless://12345678-1234-1234-1234-123456789abc@wrapped.example:443\n\
+hysteria2://synthetic-password@hy.example:443?sni=hy.example",
+        );
         let wrapped = wrapped
             .as_bytes()
             .chunks(19)
@@ -138,8 +140,9 @@ async fn decodes_line_wrapped_base64_from_http_source() {
         .await
         .unwrap();
 
-    assert_eq!(report.configs.len(), 1);
+    assert_eq!(report.configs.len(), 2);
     assert_eq!(report.configs[0].protocol, Protocol::Vless);
+    assert_eq!(report.configs[1].protocol, Protocol::Hysteria2);
 }
 
 #[test]

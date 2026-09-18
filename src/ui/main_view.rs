@@ -246,31 +246,49 @@ pub fn show(
                     }
                 });
                 ui.add_space(8.0);
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        for index in visible_indices.iter().copied() {
-                            let config = &report.configs[index];
-                            let response = config_card::show(
-                                ui,
-                                config,
-                                *selected == Some(index),
-                                selected_configs.contains(&index),
-                            );
-                            if response.selection_toggled {
-                                if selected_configs.contains(&index) {
-                                    selected_configs.remove(&index);
-                                } else {
-                                    selected_configs.insert(index);
+                let list_height = ui.available_height().max(1.0);
+                ui.allocate_ui_with_layout(
+                    egui::vec2(ui.available_width(), list_height),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        // The default egui scrollbar is intentionally subtle. In this dense
+                        // catalog that makes the only scrollable region look clipped, so use a
+                        // solid, high-contrast rail and reserve its width in the layout.
+                        ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();
+                        ui.spacing_mut().scroll.bar_width = 10.0;
+                        egui::ScrollArea::vertical()
+                            .id_salt("catalog-list")
+                            .max_height(list_height)
+                            .min_scrolled_height(list_height)
+                            .scroll_bar_visibility(
+                                egui::scroll_area::ScrollBarVisibility::AlwaysVisible,
+                            )
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                for index in visible_indices.iter().copied() {
+                                    let config = &report.configs[index];
+                                    let response = config_card::show(
+                                        ui,
+                                        config,
+                                        *selected == Some(index),
+                                        selected_configs.contains(&index),
+                                    );
+                                    if response.selection_toggled {
+                                        if selected_configs.contains(&index) {
+                                            selected_configs.remove(&index);
+                                        } else {
+                                            selected_configs.insert(index);
+                                        }
+                                    }
+                                    if response.clicked {
+                                        *selected = Some(index);
+                                        result.selected = Some(index);
+                                    }
+                                    ui.add_space(8.0);
                                 }
-                            }
-                            if response.clicked {
-                                *selected = Some(index);
-                                result.selected = Some(index);
-                            }
-                            ui.add_space(8.0);
-                        }
-                    });
+                            });
+                    },
+                );
             } else {
                 ui.vertical_centered(|ui| {
                     ui.add_space(16.0);
@@ -290,31 +308,26 @@ pub fn show(
             if report.is_none() {
                 theme::draw_network_backdrop(ui);
             }
-            egui::ScrollArea::vertical()
-                .id_salt("workspace-inspector")
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    if let Some(report) = report {
-                        if let Some(index) = *selected {
-                            if let Some(config) = report.configs.get(index) {
-                                let content_width = ui.available_width().min(920.0);
-                                ui.allocate_ui_with_layout(
-                                    egui::vec2(content_width, ui.available_height()),
-                                    egui::Layout::top_down(egui::Align::Min),
-                                    |ui| details::show(ui, config, show_sensitive, qr),
-                                );
-                                ui.add_space(12.0);
-                                egui::CollapsingHeader::new("Decode pipeline")
-                                    .default_open(false)
-                                    .show(ui, |ui| inspector::show_stages(ui, report));
-                            }
-                        } else {
-                            inspector::show(ui, report);
-                        }
-                    } else {
-                        empty_state(ui, status, running);
+            if let Some(report) = report {
+                if let Some(index) = *selected {
+                    if let Some(config) = report.configs.get(index) {
+                        let content_width = ui.available_width().min(920.0);
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(content_width, ui.available_height()),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| details::show(ui, config, show_sensitive, qr),
+                        );
+                        ui.add_space(12.0);
+                        egui::CollapsingHeader::new("Decode pipeline")
+                            .default_open(false)
+                            .show(ui, |ui| inspector::show_stages(ui, report));
                     }
-                });
+                } else {
+                    inspector::show(ui, report);
+                }
+            } else {
+                empty_state(ui, status, running);
+            }
         });
 
     if let Some(matrix) = qr.as_ref() {
