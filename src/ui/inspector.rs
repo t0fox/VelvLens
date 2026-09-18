@@ -64,11 +64,14 @@ pub fn pipeline_strip(
         };
         theme::control_frame(theme::SURFACE).show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("●").color(if running {
-                    theme::WARNING
-                } else {
-                    theme::SUCCESS
-                }));
+                status_mark(
+                    ui,
+                    if running {
+                        theme::WARNING
+                    } else {
+                        theme::SUCCESS
+                    },
+                );
                 ui.label(egui::RichText::new(message).size(11.0).color(theme::MUTED));
             });
         });
@@ -96,15 +99,15 @@ pub fn show(ui: &mut egui::Ui, report: &AnalysisReport) {
 
 pub fn show_stages(ui: &mut egui::Ui, report: &AnalysisReport) {
     for stage in &report.stages {
-        let (icon, color) = match stage.status {
-            StageStatus::Success => ("✓", theme::SUCCESS),
-            StageStatus::Failed => ("!", theme::ERROR),
-            StageStatus::Running => ("…", theme::WARNING),
-            StageStatus::Skipped => ("–", theme::MUTED),
-            StageStatus::Cancelled => ("×", theme::WARNING),
+        let color = match stage.status {
+            StageStatus::Success => theme::SUCCESS,
+            StageStatus::Failed => theme::ERROR,
+            StageStatus::Running => theme::WARNING,
+            StageStatus::Skipped => theme::MUTED,
+            StageStatus::Cancelled => theme::WARNING,
         };
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(icon).strong().color(color));
+            status_mark(ui, color);
             ui.label(
                 egui::RichText::new(format_stage(stage.kind))
                     .size(12.0)
@@ -134,17 +137,37 @@ pub fn show_stages(ui: &mut egui::Ui, report: &AnalysisReport) {
 }
 
 fn pipeline_step(ui: &mut egui::Ui, label: &str, status: Option<StageStatus>) {
-    let (icon, color) = match status {
-        Some(StageStatus::Success) => ("✓", theme::SUCCESS),
-        Some(StageStatus::Failed) => ("!", theme::ERROR),
-        Some(StageStatus::Running) => ("…", theme::WARNING),
-        Some(StageStatus::Cancelled) => ("×", theme::WARNING),
-        Some(StageStatus::Skipped) | None => ("–", theme::MUTED),
+    let color = match status {
+        Some(StageStatus::Success) => theme::SUCCESS,
+        Some(StageStatus::Failed) => theme::ERROR,
+        Some(StageStatus::Running) => theme::WARNING,
+        Some(StageStatus::Cancelled) => theme::WARNING,
+        Some(StageStatus::Skipped) | None => theme::MUTED,
     };
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(icon).strong().color(color));
+        status_mark(ui, color);
         ui.label(egui::RichText::new(label).size(11.0).color(theme::MUTED));
     });
+}
+
+fn status_mark(ui: &mut egui::Ui, color: egui::Color32) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.circle_filled(rect.center(), 5.0, color);
+    painter.line_segment(
+        [
+            rect.center() + egui::vec2(-2.5, 0.0),
+            rect.center() + egui::vec2(-0.5, 2.0),
+        ],
+        egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(8, 12, 20)),
+    );
+    painter.line_segment(
+        [
+            rect.center() + egui::vec2(-0.5, 2.0),
+            rect.center() + egui::vec2(3.0, -2.5),
+        ],
+        egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(8, 12, 20)),
+    );
 }
 
 fn stage_status(

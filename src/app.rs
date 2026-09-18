@@ -72,9 +72,10 @@ impl SubLensApp {
                 JobEvent::Started => self.status = "Fetching source…".to_owned(),
                 JobEvent::Completed(report) => {
                     self.status = format!(
-                        "✓ HTTP → ✓ Decode → ✓ {} configurations found",
+                        "HTTP complete · Decode complete · {} configurations found",
                         report.configs.len()
                     );
+                    self.selected = report.configs.first().map(|_| 0);
                     self.report = Some(report);
                     finished = true;
                 }

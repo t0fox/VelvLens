@@ -126,7 +126,7 @@ pub fn show(
             if ui
                 .add_sized(
                     [190.0, 36.0],
-                    egui::Button::new(egui::RichText::new("▣  Copy configuration").strong())
+                    egui::Button::new(egui::RichText::new("Copy configuration").strong())
                         .fill(theme::ACCENT),
                 )
                 .clicked()
@@ -136,7 +136,7 @@ pub fn show(
             if ui
                 .add_sized(
                     [182.0, 36.0],
-                    egui::Button::new("▤  Copy sanitized").fill(theme::SURFACE_RAISED),
+                    egui::Button::new("Copy sanitized").fill(theme::SURFACE_RAISED),
                 )
                 .clicked()
             {

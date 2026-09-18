@@ -30,7 +30,7 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
     } else {
         egui::Stroke::new(1.0_f32, theme::BORDER)
     };
-    let response = egui::Frame::none()
+    let frame_response = egui::Frame::none()
         .fill(fill)
         .stroke(stroke)
         .rounding(egui::Rounding::same(10.0))
@@ -95,7 +95,11 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
             });
         })
         .response;
-    response
+    ui.interact(
+        frame_response.rect,
+        ui.id().with(("config-card", config.id.as_str())),
+        egui::Sense::click(),
+    )
 }
 
 fn protocol_mark(ui: &mut egui::Ui, protocol: Protocol) {

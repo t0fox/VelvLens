@@ -55,7 +55,7 @@ pub fn show(
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let settings = ui.add_sized(
                         [92.0, 34.0],
-                        egui::Button::new(egui::RichText::new("⚙  Settings").size(12.0))
+                        egui::Button::new(egui::RichText::new("Settings").size(12.0))
                             .fill(theme::SURFACE_RAISED),
                     );
                     if settings.clicked() {
@@ -88,7 +88,7 @@ pub fn show(
                 }
                 let paste = ui.add_sized(
                     [94.0, 36.0],
-                    egui::Button::new(egui::RichText::new("▣  Paste").size(12.0))
+                    egui::Button::new(egui::RichText::new("Paste").size(12.0))
                         .fill(theme::SURFACE_RAISED),
                 );
                 if paste.clicked() {
@@ -101,13 +101,13 @@ pub fn show(
                 let action = if running {
                     ui.add_sized(
                         [132.0, 36.0],
-                        egui::Button::new(egui::RichText::new("×  Cancel").size(13.0).strong())
+                        egui::Button::new(egui::RichText::new("Cancel").size(13.0).strong())
                             .fill(theme::SURFACE_RAISED),
                     )
                 } else {
                     ui.add_sized(
                         [142.0, 36.0],
-                        egui::Button::new(egui::RichText::new("▷  Analyze").size(13.0).strong())
+                        egui::Button::new(egui::RichText::new("Analyze").size(13.0).strong())
                             .fill(theme::ACCENT),
                     )
                 };
@@ -143,7 +143,7 @@ pub fn show(
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let copy = ui.add_sized(
                             [88.0, 30.0],
-                            egui::Button::new(egui::RichText::new("▣  Copy all").size(11.0))
+                            egui::Button::new(egui::RichText::new("Copy all").size(11.0))
                                 .fill(theme::SURFACE_RAISED),
                         );
                         if copy.clicked() {
@@ -167,7 +167,7 @@ pub fn show(
                 let search_width = ui.available_width();
                 ui.add_sized(
                     [search_width, 32.0],
-                    egui::TextEdit::singleline(search).hint_text("⌕  Search host or name…"),
+                    egui::TextEdit::singleline(search).hint_text("Search host or name…"),
                 );
                 ui.add_space(10.0);
                 egui::ScrollArea::vertical()
