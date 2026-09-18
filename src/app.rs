@@ -10,6 +10,8 @@ use crate::{
 };
 use eframe::egui;
 
+use crate::ui::theme;
+
 pub struct SubLensApp {
     input: String,
     status: String,
@@ -141,12 +143,25 @@ impl eframe::App for SubLensApp {
 
 fn configure_style(ctx: &egui::Context) {
     let mut visuals = egui::Visuals::dark();
-    visuals.window_fill = egui::Color32::from_rgb(18, 23, 30);
-    visuals.panel_fill = egui::Color32::from_rgb(15, 20, 27);
-    visuals.extreme_bg_color = egui::Color32::from_rgb(10, 14, 19);
+    visuals.window_fill = theme::CANVAS;
+    visuals.panel_fill = theme::CANVAS;
+    visuals.extreme_bg_color = egui::Color32::from_rgb(8, 12, 20);
+    visuals.faint_bg_color = theme::SURFACE;
+    visuals.override_text_color = Some(theme::TEXT);
+    visuals.widgets.noninteractive.bg_fill = theme::SURFACE;
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, theme::MUTED);
+    visuals.widgets.inactive.bg_fill = theme::SURFACE;
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT);
+    visuals.widgets.hovered.bg_fill = theme::SURFACE_RAISED;
+    visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT);
+    visuals.widgets.active.bg_fill = theme::ACCENT;
+    visuals.widgets.active.fg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
+    visuals.selection.bg_fill = theme::ACCENT;
+    visuals.selection.stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
     ctx.set_visuals(visuals);
     let mut style = (*ctx.style()).clone();
-    style.spacing.item_spacing = egui::vec2(10.0, 8.0);
-    style.spacing.button_padding = egui::vec2(12.0, 7.0);
+    style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+    style.spacing.button_padding = egui::vec2(12.0, 8.0);
+    style.spacing.interact_size = egui::vec2(44.0, 34.0);
     ctx.set_style(style);
 }

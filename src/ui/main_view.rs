@@ -2,7 +2,7 @@ use eframe::egui;
 
 use crate::{model::Protocol, resolver::AnalysisReport};
 
-use super::{config_card, details, inspector};
+use super::{config_card, details, inspector, theme};
 
 pub struct MainViewResult {
     pub analyze: bool,
@@ -33,139 +33,222 @@ pub fn show(
         copy_all: false,
         open_settings: false,
     };
-    egui::TopBottomPanel::top("header").show(ctx, |ui| {
-        ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            ui.heading(
-                egui::RichText::new("SubLens").color(egui::Color32::from_rgb(110, 190, 255)),
-            );
-            ui.label(
-                egui::RichText::new("visual proxy subscription inspector")
-                    .color(egui::Color32::from_rgb(145, 158, 178)),
-            );
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Settings").clicked() {
-                    result.open_settings = true;
-                }
+
+    egui::TopBottomPanel::top("header")
+        .frame(
+            egui::Frame::none()
+                .fill(theme::CANVAS)
+                .inner_margin(egui::Margin::symmetric(20.0, 12.0)),
+        )
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                theme::draw_logo(ui);
+                ui.add_space(4.0);
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("SubLens").size(18.0).strong());
+                    ui.label(
+                        egui::RichText::new("visual proxy subscription inspector")
+                            .size(11.0)
+                            .color(theme::MUTED),
+                    );
+                });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let settings = ui.add_sized(
+                        [92.0, 34.0],
+                        egui::Button::new(egui::RichText::new("⚙  Settings").size(12.0))
+                            .fill(theme::SURFACE_RAISED),
+                    );
+                    if settings.clicked() {
+                        result.open_settings = true;
+                    }
+                });
             });
-        });
-        ui.horizontal(|ui| {
-            ui.label("Subscription / Share URL");
-            ui.add(
-                egui::TextEdit::singleline(input)
-                    .desired_width(520.0)
-                    .hint_text("https://example.com/subscription"),
-            );
-            if ui.button("Paste").clicked() {
-                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    if let Ok(text) = clipboard.get_text() {
-                        *input = text;
+
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                let reserved = if history.is_empty() { 292.0 } else { 388.0 };
+                let input_width = (ui.available_width() - reserved).max(240.0);
+                ui.add_sized(
+                    [input_width, 36.0],
+                    egui::TextEdit::singleline(input)
+                        .hint_text("Paste a subscription URL…")
+                        .font(egui::TextStyle::Body),
+                );
+                if !history.is_empty() {
+                    egui::ComboBox::from_id_salt("recent-history")
+                        .selected_text("Recent")
+                        .width(78.0)
+                        .show_ui(ui, |ui| {
+                            for url in history {
+                                if ui.selectable_label(false, url).clicked() {
+                                    *input = url.clone();
+                                }
+                            }
+                        });
+                }
+                let paste = ui.add_sized(
+                    [94.0, 36.0],
+                    egui::Button::new(egui::RichText::new("▣  Paste").size(12.0))
+                        .fill(theme::SURFACE_RAISED),
+                );
+                if paste.clicked() {
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        if let Ok(text) = clipboard.get_text() {
+                            *input = text;
+                        }
                     }
                 }
-            }
-            if !history.is_empty() {
-                egui::ComboBox::from_id_salt("recent-history")
-                    .selected_text("Recent")
-                    .show_ui(ui, |ui| {
-                        for url in history {
-                            if ui.selectable_label(false, url).clicked() {
-                                *input = url.clone();
-                            }
+                let action = if running {
+                    ui.add_sized(
+                        [132.0, 36.0],
+                        egui::Button::new(egui::RichText::new("×  Cancel").size(13.0).strong())
+                            .fill(theme::SURFACE_RAISED),
+                    )
+                } else {
+                    ui.add_sized(
+                        [142.0, 36.0],
+                        egui::Button::new(egui::RichText::new("▷  Analyze").size(13.0).strong())
+                            .fill(theme::ACCENT),
+                    )
+                };
+                if action.clicked() {
+                    if running {
+                        result.cancel = true;
+                    } else {
+                        result.analyze = true;
+                    }
+                }
+            });
+
+            ui.add_space(10.0);
+            inspector::pipeline_strip(ui, report, running, status);
+        });
+
+    egui::SidePanel::left("catalog")
+        .resizable(true)
+        .default_width(382.0)
+        .min_width(320.0)
+        .max_width(460.0)
+        .frame(theme::surface_frame(theme::SURFACE))
+        .show(ctx, |ui| {
+            if let Some(report) = report {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("Configurations").size(16.0).strong());
+                    theme::badge(
+                        ui,
+                        &report.configs.len().to_string(),
+                        theme::SURFACE_RAISED,
+                        theme::MUTED,
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let copy = ui.add_sized(
+                            [88.0, 30.0],
+                            egui::Button::new(egui::RichText::new("▣  Copy all").size(11.0))
+                                .fill(theme::SURFACE_RAISED),
+                        );
+                        if copy.clicked() {
+                            result.copy_all = true;
                         }
                     });
-            }
-            if running {
-                if ui.button("Cancel").clicked() {
-                    result.cancel = true;
-                }
-            } else if ui.button("Analyze").clicked() {
-                result.analyze = true;
-            }
-        });
-        ui.label(
-            egui::RichText::new(status)
-                .small()
-                .color(egui::Color32::from_rgb(155, 170, 190)),
-        );
-        ui.add_space(10.0);
-    });
-
-    egui::SidePanel::right("inspector")
-        .resizable(true)
-        .default_width(360.0)
-        .show(ctx, |ui| {
-            if let (Some(report), Some(index)) = (report, *selected) {
-                if let Some(config) = report.configs.get(index) {
-                    details::show(ui, config, show_sensitive, qr);
-                }
-            } else if let Some(report) = report {
-                inspector::show(ui, report);
-            } else {
-                ui.heading("Inspector");
-                ui.label("Analyze a subscription to inspect its pipeline.");
-            }
-        });
-
-    egui::CentralPanel::default().show(ctx, |ui| {
-        if let Some(report) = report {
-            inspector::show(ui, report);
-            ui.separator();
-            ui.horizontal_wrapped(|ui| {
-                filter_button(ui, "All", filter, None);
-                for protocol in Protocol::ALL {
-                    filter_button(ui, protocol.as_str(), filter, Some(protocol));
-                }
-                ui.separator();
-                ui.add(
-                    egui::TextEdit::singleline(search)
-                        .desired_width(180.0)
-                        .hint_text("Search host or name"),
+                });
+                ui.add_space(10.0);
+                ui.horizontal_wrapped(|ui| {
+                    filter_button(ui, "All", report.configs.len(), filter, None);
+                    for protocol in Protocol::ALL {
+                        let count = report
+                            .configs
+                            .iter()
+                            .filter(|config| config.protocol == protocol)
+                            .count();
+                        filter_button(ui, protocol.as_str(), count, filter, Some(protocol));
+                    }
+                });
+                ui.add_space(8.0);
+                let search_width = ui.available_width();
+                ui.add_sized(
+                    [search_width, 32.0],
+                    egui::TextEdit::singleline(search).hint_text("⌕  Search host or name…"),
                 );
-                if ui.button("Copy all for v2rayN").clicked() {
-                    result.copy_all = true;
+                ui.add_space(10.0);
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        for (index, config) in report.configs.iter().enumerate() {
+                            if filter
+                                .as_ref()
+                                .is_some_and(|active| *active != config.protocol)
+                            {
+                                continue;
+                            }
+                            if !search.is_empty()
+                                && !format!(
+                                    "{} {}",
+                                    config.name.as_deref().unwrap_or_default(),
+                                    config.host
+                                )
+                                .to_ascii_lowercase()
+                                .contains(&search.to_ascii_lowercase())
+                            {
+                                continue;
+                            }
+                            let response = config_card::show(ui, config, *selected == Some(index));
+                            if response.clicked() {
+                                *selected = Some(index);
+                                result.selected = Some(index);
+                            }
+                            ui.add_space(8.0);
+                        }
+                    });
+            } else {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(16.0);
+                    ui.label(egui::RichText::new("Configurations").size(15.0).strong());
+                    ui.label(egui::RichText::new("No analysis yet").color(theme::MUTED));
+                });
+            }
+        });
+
+    egui::CentralPanel::default()
+        .frame(
+            egui::Frame::none()
+                .fill(theme::CANVAS)
+                .inner_margin(egui::Margin::same(18.0)),
+        )
+        .show(ctx, |ui| {
+            theme::draw_network_backdrop(ui);
+            if let Some(report) = report {
+                if let Some(index) = *selected {
+                    if let Some(config) = report.configs.get(index) {
+                        details::show(ui, config, show_sensitive, qr);
+                        ui.add_space(12.0);
+                        egui::CollapsingHeader::new("Decode pipeline")
+                            .default_open(false)
+                            .show(ui, |ui| inspector::show_stages(ui, report));
+                    }
+                } else {
+                    inspector::show(ui, report);
                 }
-            });
-            ui.add_space(8.0);
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for (index, config) in report.configs.iter().enumerate() {
-                    if filter
-                        .as_ref()
-                        .is_some_and(|active| *active != config.protocol)
-                    {
-                        continue;
-                    }
-                    if !search.is_empty()
-                        && !format!(
-                            "{} {}",
-                            config.name.as_deref().unwrap_or_default(),
-                            config.host
-                        )
-                        .to_ascii_lowercase()
-                        .contains(&search.to_ascii_lowercase())
-                    {
-                        continue;
-                    }
-                    let response = config_card::show(ui, config, *selected == Some(index));
-                    if response.clicked() {
-                        *selected = Some(index);
-                        result.selected = Some(index);
-                    }
-                    ui.add_space(8.0);
-                }
-            });
-        } else {
-            empty_state(ui);
-        }
-    });
+            } else {
+                empty_state(ui);
+            }
+        });
 
     if let Some(matrix) = qr.as_ref() {
         let mut close = false;
-        egui::Window::new("QR Code")
+        egui::Window::new("QR code")
             .collapsible(false)
             .resizable(false)
+            .frame(theme::surface_frame(theme::SURFACE))
             .show(ctx, |ui| {
                 draw_qr(ui, matrix);
-                if ui.button("Close").clicked() {
+                ui.add_space(8.0);
+                if ui
+                    .add_sized(
+                        [280.0, 34.0],
+                        egui::Button::new("Close").fill(theme::SURFACE_RAISED),
+                    )
+                    .clicked()
+                {
                     close = true;
                 }
             });
@@ -179,20 +262,57 @@ pub fn show(
 fn filter_button(
     ui: &mut egui::Ui,
     label: &str,
+    count: usize,
     filter: &mut Option<Protocol>,
     value: Option<Protocol>,
 ) {
     let active = *filter == value;
-    if ui.selectable_label(active, label).clicked() {
+    let fill = if active {
+        theme::ACCENT
+    } else {
+        theme::SURFACE_RAISED
+    };
+    let color = if active {
+        egui::Color32::WHITE
+    } else {
+        theme::MUTED
+    };
+    let response = ui.add_sized(
+        [ui.available_width().min(94.0), 30.0],
+        egui::Button::new(
+            egui::RichText::new(format!("{label}  {count}"))
+                .size(11.0)
+                .strong()
+                .color(color),
+        )
+        .fill(fill),
+    );
+    if response.clicked() {
         *filter = value;
     }
 }
 
 fn empty_state(ui: &mut egui::Ui) {
-    ui.vertical_centered(|ui| {
-        ui.add_space(120.0);
-        ui.heading("Inspect a subscription locally");
-        ui.label("Paste a share URL above. SubLens will show every decode and extraction stage without sending credentials to a backend.");
+    theme::surface_frame(theme::SURFACE).show(ui, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.add_space(78.0);
+            theme::draw_logo(ui);
+            ui.add_space(14.0);
+            ui.label(
+                egui::RichText::new("Inspect a subscription locally")
+                    .size(22.0)
+                    .strong(),
+            );
+            ui.add_space(6.0);
+            ui.label(
+                egui::RichText::new(
+                    "Paste a source above to see its decode and extraction stages.",
+                )
+                .size(13.0)
+                .color(theme::MUTED),
+            );
+            ui.add_space(78.0);
+        });
     });
 }
 
@@ -201,7 +321,7 @@ fn draw_qr(ui: &mut egui::Ui, matrix: &crate::qr::QrMatrix) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
     let cell = size / matrix.width() as f32;
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, 0.0, egui::Color32::WHITE);
+    painter.rect_filled(rect, egui::Rounding::same(8.0), egui::Color32::WHITE);
     for y in 0..matrix.width() {
         for x in 0..matrix.width() {
             if matrix.is_dark(x, y) {

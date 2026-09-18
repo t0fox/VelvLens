@@ -1,64 +1,124 @@
 use eframe::egui;
 
-use crate::model::ProxyConfig;
+use crate::model::{Protocol, ProxyConfig};
+
+use super::theme;
 
 pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Response {
-    let frame = egui::Frame::group(ui.style())
-        .fill(if selected {
-            egui::Color32::from_rgb(35, 48, 65)
-        } else {
-            egui::Color32::from_rgb(25, 31, 40)
-        })
-        .stroke(egui::Stroke::new(
-            1.0_f32,
-            if selected {
-                egui::Color32::from_rgb(72, 154, 255)
-            } else {
-                egui::Color32::from_rgb(50, 58, 70)
-            },
-        ))
-        .rounding(egui::Rounding::same(12.0))
-        .inner_margin(egui::Margin::same(14.0));
-    frame
+    let cursor = ui.cursor().min;
+    let card_rect = egui::Rect::from_min_size(
+        cursor,
+        egui::vec2(
+            ui.available_width(),
+            if config.sni.is_some() { 94.0 } else { 82.0 },
+        ),
+    );
+    let hovered = ui
+        .input(|input| input.pointer.hover_pos())
+        .is_some_and(|position| card_rect.contains(position));
+    let fill = if selected {
+        theme::SURFACE_SELECTED
+    } else if hovered {
+        theme::SURFACE_RAISED
+    } else {
+        theme::SURFACE
+    };
+    let stroke = if selected {
+        egui::Stroke::new(1.0_f32, theme::BORDER_SELECTED)
+    } else if hovered {
+        egui::Stroke::new(1.0_f32, theme::ACCENT_HOVER)
+    } else {
+        egui::Stroke::new(1.0_f32, theme::BORDER)
+    };
+    let response = egui::Frame::none()
+        .fill(fill)
+        .stroke(stroke)
+        .rounding(egui::Rounding::same(10.0))
+        .inner_margin(egui::Margin::symmetric(12.0, 10.0))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(config.protocol.as_str())
-                        .strong()
-                        .color(egui::Color32::from_rgb(110, 190, 255)),
-                );
-                if config.metadata.exact_duplicate_count > 1 {
+                protocol_mark(ui, config.protocol);
+                ui.add_space(6.0);
+                ui.vertical(|ui| {
                     ui.label(
-                        egui::RichText::new(format!(
-                            "Duplicate ×{}",
-                            config.metadata.exact_duplicate_count
-                        ))
-                        .small()
-                        .color(egui::Color32::YELLOW),
+                        egui::RichText::new(
+                            config.name.as_deref().unwrap_or("Unnamed configuration"),
+                        )
+                        .size(13.0)
+                        .strong(),
+                    );
+                    ui.label(
+                        egui::RichText::new(format!("{}:{}", config.host, config.port))
+                            .size(11.0)
+                            .color(theme::MUTED),
+                    );
+                });
+                if config.metadata.exact_duplicate_count > 1 {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                        theme::badge(
+                            ui,
+                            &format!("×{}", config.metadata.exact_duplicate_count),
+                            egui::Color32::from_rgba_unmultiplied(231, 173, 60, 34),
+                            theme::WARNING,
+                        );
+                    });
+                }
+            });
+            ui.add_space(7.0);
+            ui.horizontal_wrapped(|ui| {
+                theme::badge(
+                    ui,
+                    config.protocol.as_str(),
+                    protocol_fill(config.protocol),
+                    egui::Color32::WHITE,
+                );
+                theme::badge(
+                    ui,
+                    config.security.as_str(),
+                    theme::SURFACE_RAISED,
+                    theme::MUTED,
+                );
+                theme::badge(
+                    ui,
+                    config.transport.as_str(),
+                    theme::SURFACE_RAISED,
+                    theme::MUTED,
+                );
+                if let Some(sni) = &config.sni {
+                    theme::badge(
+                        ui,
+                        &format!("SNI {sni}"),
+                        theme::SURFACE_RAISED,
+                        theme::MUTED,
                     );
                 }
             });
-            ui.add_space(4.0);
-            ui.label(
-                egui::RichText::new(config.name.as_deref().unwrap_or("Unnamed configuration"))
-                    .strong(),
-            );
-            ui.label(format!("{}:{}", config.host, config.port));
-            ui.horizontal_wrapped(|ui| {
-                badge(ui, config.transport.as_str());
-                badge(ui, config.security.as_str());
-                if let Some(sni) = &config.sni {
-                    badge(ui, &format!("SNI {sni}"));
-                }
-            });
         })
-        .response
+        .response;
+    response
 }
 
-fn badge(ui: &mut egui::Ui, text: &str) {
-    ui.label(
-        egui::RichText::new(text)
-            .small()
-            .color(egui::Color32::from_rgb(170, 184, 204)),
+fn protocol_mark(ui: &mut egui::Ui, protocol: Protocol) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(34.0, 34.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, egui::Rounding::same(9.0), protocol_fill(protocol));
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        protocol.as_str().chars().next().unwrap_or('?'),
+        egui::FontId::proportional(14.0),
+        egui::Color32::WHITE,
     );
+}
+
+fn protocol_fill(protocol: Protocol) -> egui::Color32 {
+    match protocol {
+        Protocol::Vless => egui::Color32::from_rgb(124, 58, 237),
+        Protocol::Vmess => egui::Color32::from_rgb(37, 99, 235),
+        Protocol::Trojan => egui::Color32::from_rgb(234, 88, 12),
+        Protocol::Shadowsocks => egui::Color32::from_rgb(14, 165, 164),
+        Protocol::Hysteria2 => egui::Color32::from_rgb(22, 163, 74),
+        Protocol::Tuic => egui::Color32::from_rgb(219, 39, 119),
+        Protocol::Unknown => egui::Color32::from_rgb(100, 116, 139),
+    }
 }
