@@ -39,12 +39,6 @@ pub fn show(
         ui.horizontal_wrapped(|ui| {
             theme::badge(
                 ui,
-                config.protocol.as_str(),
-                theme::ACCENT,
-                egui::Color32::WHITE,
-            );
-            theme::badge(
-                ui,
                 config.transport.as_str(),
                 theme::SURFACE_RAISED,
                 theme::MUTED,
@@ -56,53 +50,60 @@ pub fn show(
         ui.add_space(14.0);
         ui.separator();
         ui.add_space(10.0);
-        ui.columns(2, |columns| {
-            let left = &mut columns[0];
-            field(left, "Address", &config.host);
-            field(left, "Port", &config.port.to_string());
-            field(left, "Security", config.security.as_str());
-            let right = &mut columns[1];
-            field(right, "Transport", config.transport.as_str());
-            field(right, "SNI", config.sni.as_deref().unwrap_or("—"));
-            field(
-                right,
-                "Fingerprint",
-                config.fingerprint.as_deref().unwrap_or("—"),
-            );
-            field(
-                right,
-                "Public key",
-                config.reality_public_key.as_deref().unwrap_or("—"),
-            );
-            field(
-                right,
-                "Short ID",
-                config.reality_short_id.as_deref().unwrap_or("—"),
-            );
-        });
-        ui.add_space(4.0);
+        let public_key = compact_value(config.reality_public_key.as_deref().unwrap_or("—"), 28);
+        let short_id = compact_value(config.reality_short_id.as_deref().unwrap_or("—"), 18);
+        let uuid = if show_sensitive {
+            compact_value(config.uuid.as_deref().unwrap_or("—"), 24)
+        } else {
+            "••••••".to_owned()
+        };
+        let password = if show_sensitive {
+            compact_value(config.password.as_deref().unwrap_or("—"), 24)
+        } else {
+            "••••••".to_owned()
+        };
+        egui::Grid::new(ui.id().with("configuration-fields"))
+            .num_columns(4)
+            .spacing(egui::vec2(20.0, 14.0))
+            .show(ui, |ui| {
+                detail_pair(
+                    ui,
+                    "Address",
+                    &config.host,
+                    "Transport",
+                    config.transport.as_str(),
+                );
+                ui.end_row();
+                detail_pair(
+                    ui,
+                    "Port",
+                    &config.port.to_string(),
+                    "SNI",
+                    config.sni.as_deref().unwrap_or("—"),
+                );
+                ui.end_row();
+                detail_pair(
+                    ui,
+                    "Security",
+                    config.security.as_str(),
+                    "Fingerprint",
+                    config.fingerprint.as_deref().unwrap_or("—"),
+                );
+                ui.end_row();
+                detail_pair(ui, "Public key", &public_key, "Short ID", &short_id);
+                ui.end_row();
+                detail_pair(ui, "UUID", &uuid, "Password", &password);
+                ui.end_row();
+            });
+        ui.add_space(12.0);
         ui.horizontal(|ui| {
-            field(
-                ui,
-                "UUID",
-                if show_sensitive {
-                    config.uuid.as_deref().unwrap_or("—")
-                } else {
-                    "••••••"
-                },
-            );
-            ui.add_space(20.0);
-            field(
-                ui,
-                "Password",
-                if show_sensitive {
-                    config.password.as_deref().unwrap_or("—")
-                } else {
-                    "••••••"
-                },
+            ui.label(
+                egui::RichText::new("Credentials are masked by default")
+                    .size(11.0)
+                    .color(theme::MUTED),
             );
         });
-        ui.add_space(10.0);
+        ui.add_space(8.0);
         egui::Frame::none()
             .fill(theme::CANVAS)
             .stroke(egui::Stroke::new(1.0_f32, theme::BORDER))
@@ -159,13 +160,32 @@ fn protocol_badge(ui: &mut egui::Ui, protocol: &str) {
     theme::badge(ui, protocol, theme::ACCENT, egui::Color32::WHITE);
 }
 
-fn field(ui: &mut egui::Ui, label: &str, value: &str) {
-    ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(label).size(11.0).color(theme::MUTED));
-        ui.add_space(8.0);
-        ui.label(egui::RichText::new(value).size(12.0).strong());
-    });
-    ui.add_space(7.0);
+fn detail_pair(ui: &mut egui::Ui, label: &str, value: &str, next_label: &str, next_value: &str) {
+    ui.label(egui::RichText::new(label).size(11.0).color(theme::MUTED));
+    ui.label(egui::RichText::new(value).size(12.0).strong());
+    ui.label(
+        egui::RichText::new(next_label)
+            .size(11.0)
+            .color(theme::MUTED),
+    );
+    ui.label(egui::RichText::new(next_value).size(12.0).strong());
+}
+
+fn compact_value(value: &str, max_chars: usize) -> String {
+    let chars: Vec<char> = value.chars().collect();
+    if chars.len() <= max_chars {
+        return value.to_owned();
+    }
+    let prefix: String = chars.iter().take(max_chars.saturating_sub(7)).collect();
+    let suffix: String = chars
+        .iter()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{prefix}…{suffix}")
 }
 
 pub fn copy_to_clipboard(value: &str) {

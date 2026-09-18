@@ -6,13 +6,7 @@ use super::theme;
 
 pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Response {
     let cursor = ui.cursor().min;
-    let card_rect = egui::Rect::from_min_size(
-        cursor,
-        egui::vec2(
-            ui.available_width(),
-            if config.sni.is_some() { 94.0 } else { 82.0 },
-        ),
-    );
+    let card_rect = egui::Rect::from_min_size(cursor, egui::vec2(ui.available_width(), 80.0));
     let hovered = ui
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|position| card_rect.contains(position));
@@ -64,7 +58,7 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
                     });
                 }
             });
-            ui.add_space(7.0);
+            ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
                 theme::badge(
                     ui,
@@ -84,14 +78,6 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
                     theme::SURFACE_RAISED,
                     theme::MUTED,
                 );
-                if let Some(sni) = &config.sni {
-                    theme::badge(
-                        ui,
-                        &format!("SNI {sni}"),
-                        theme::SURFACE_RAISED,
-                        theme::MUTED,
-                    );
-                }
             });
         })
         .response;

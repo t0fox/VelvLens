@@ -65,6 +65,12 @@ pub fn show(
             });
 
             ui.add_space(10.0);
+            ui.label(
+                egui::RichText::new("Source URL")
+                    .size(11.0)
+                    .strong()
+                    .color(theme::MUTED),
+            );
             ui.horizontal(|ui| {
                 let reserved = if history.is_empty() { 292.0 } else { 388.0 };
                 let input_width = (ui.available_width() - reserved).max(240.0);
@@ -152,17 +158,22 @@ pub fn show(
                     });
                 });
                 ui.add_space(10.0);
-                ui.horizontal_wrapped(|ui| {
-                    filter_button(ui, "All", report.configs.len(), filter, None);
-                    for protocol in Protocol::ALL {
-                        let count = report
-                            .configs
-                            .iter()
-                            .filter(|config| config.protocol == protocol)
-                            .count();
-                        filter_button(ui, protocol.as_str(), count, filter, Some(protocol));
-                    }
-                });
+                egui::ScrollArea::horizontal()
+                    .id_salt("protocol-filters")
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            filter_button(ui, "All", report.configs.len(), filter, None);
+                            for protocol in Protocol::ALL {
+                                let count = report
+                                    .configs
+                                    .iter()
+                                    .filter(|config| config.protocol == protocol)
+                                    .count();
+                                filter_button(ui, protocol.as_str(), count, filter, Some(protocol));
+                            }
+                        });
+                    });
                 ui.add_space(8.0);
                 let search_width = ui.available_width();
                 ui.add_sized(
@@ -219,7 +230,12 @@ pub fn show(
             if let Some(report) = report {
                 if let Some(index) = *selected {
                     if let Some(config) = report.configs.get(index) {
-                        details::show(ui, config, show_sensitive, qr);
+                        let content_width = ui.available_width().min(920.0);
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(content_width, ui.available_height()),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| details::show(ui, config, show_sensitive, qr),
+                        );
                         ui.add_space(12.0);
                         egui::CollapsingHeader::new("Decode pipeline")
                             .default_open(false)
@@ -278,7 +294,7 @@ fn filter_button(
         theme::MUTED
     };
     let response = ui.add_sized(
-        [ui.available_width().min(94.0), 30.0],
+        [76.0, 30.0],
         egui::Button::new(
             egui::RichText::new(format!("{label}  {count}"))
                 .size(11.0)

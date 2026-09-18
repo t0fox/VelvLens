@@ -11,49 +11,54 @@ pub fn pipeline_strip(
     status: &str,
 ) {
     if let Some(report) = report {
-        ui.horizontal(|ui| {
-            pipeline_step(
-                ui,
-                "HTTP",
-                stage_status(report, |kind| {
-                    matches!(
-                        kind,
-                        crate::resolver::stage::StageKind::Http
-                            | crate::resolver::stage::StageKind::Redirect
-                    )
-                }),
-            );
-            pipeline_step(
-                ui,
-                "Decode",
-                stage_status(report, |kind| {
-                    matches!(kind, crate::resolver::stage::StageKind::Decode)
-                }),
-            );
-            pipeline_step(
-                ui,
-                "Extracted",
-                stage_status(report, |kind| {
-                    matches!(
-                        kind,
-                        crate::resolver::stage::StageKind::Extract
-                            | crate::resolver::stage::StageKind::Parse
-                    )
-                }),
-            );
-            pipeline_step(
-                ui,
-                "Deduplicated",
-                stage_status(report, |kind| {
-                    matches!(kind, crate::resolver::stage::StageKind::Deduplication)
-                }),
-            );
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(
-                    egui::RichText::new(format!("{} configurations", report.configs.len()))
-                        .size(11.0)
-                        .color(theme::MUTED),
+        theme::control_frame(theme::SURFACE).show(ui, |ui| {
+            ui.horizontal(|ui| {
+                pipeline_step(
+                    ui,
+                    "HTTP",
+                    stage_status(report, |kind| {
+                        matches!(
+                            kind,
+                            crate::resolver::stage::StageKind::Http
+                                | crate::resolver::stage::StageKind::Redirect
+                        )
+                    }),
                 );
+                ui.separator();
+                pipeline_step(
+                    ui,
+                    "Decode",
+                    stage_status(report, |kind| {
+                        matches!(kind, crate::resolver::stage::StageKind::Decode)
+                    }),
+                );
+                ui.separator();
+                pipeline_step(
+                    ui,
+                    "Extracted",
+                    stage_status(report, |kind| {
+                        matches!(
+                            kind,
+                            crate::resolver::stage::StageKind::Extract
+                                | crate::resolver::stage::StageKind::Parse
+                        )
+                    }),
+                );
+                ui.separator();
+                pipeline_step(
+                    ui,
+                    "Deduplicated",
+                    stage_status(report, |kind| {
+                        matches!(kind, crate::resolver::stage::StageKind::Deduplication)
+                    }),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("{} configurations", report.configs.len()))
+                            .size(11.0)
+                            .color(theme::MUTED),
+                    );
+                });
             });
         });
     } else {
