@@ -36,6 +36,7 @@ pub fn show(
         egui::Stroke::new(1.0_f32, theme::BORDER)
     };
     let mut selection_toggled = false;
+    let mut details_clicked = false;
     let frame_response = egui::Frame::none()
         .fill(fill)
         .stroke(stroke)
@@ -60,6 +61,16 @@ pub fn show(
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    if ui
+                        .add_sized(
+                            [62.0, 26.0],
+                            egui::Button::new(egui::RichText::new("Details").size(10.0))
+                                .fill(theme::SURFACE_RAISED),
+                        )
+                        .clicked()
+                    {
+                        details_clicked = true;
+                    }
                     let mut checked = selected_for_export;
                     if ui.checkbox(&mut checked, "Select").clicked() {
                         selection_toggled = true;
@@ -103,7 +114,7 @@ pub fn show(
         egui::Sense::click(),
     );
     CardResponse {
-        clicked: response.clicked(),
+        clicked: response.clicked() || details_clicked,
         selection_toggled,
     }
 }

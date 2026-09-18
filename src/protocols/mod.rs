@@ -10,7 +10,7 @@ use url::Url;
 
 use crate::{
     error::{Result, SubLensError},
-    model::ProxyConfig,
+    model::{Protocol, ProxyConfig, Security, Transport},
 };
 
 pub fn is_supported_scheme(uri: &str) -> bool {
@@ -38,15 +38,47 @@ pub fn parse_uri(uri: &str, source: Option<&Url>, depth: u8) -> Result<ProxyConf
         "ss" => shadowsocks::parse(uri)?,
         "hysteria" | "hysteria2" | "hy2" => hysteria2::parse(uri)?,
         "tuic" => tuic::parse(uri)?,
-        _ => {
-            return Err(SubLensError::Parse {
-                origin: crate::security::redact_uri(uri),
-                message: format!("unsupported scheme '{scheme}'"),
-            })
-        }
+        _ => parse_unknown(uri, source, depth, &scheme)?,
     };
     config.raw_uri = uri.to_owned();
     config.metadata.source_url = source.map(|url| url.to_string());
+    config.metadata.depth = depth;
+    Ok(config)
+}
+
+fn parse_unknown(uri: &str, source: Option<&Url>, depth: u8, scheme: &str) -> Result<ProxyConfig> {
+    let url = Url::parse(uri).map_err(|error| SubLensError::Parse {
+        origin: crate::security::redact_uri(uri),
+        message: format!("invalid URI: {error}"),
+    })?;
+    let host = url.host_str().unwrap_or("unknown").to_owned();
+    let port = url.port().unwrap_or_default();
+    let name = url.fragment().map(common::decode_component);
+    let mut config = common::finish(
+        Protocol::Unknown,
+        name,
+        host,
+        port,
+        None,
+        None,
+        None,
+        Security::Unknown,
+        Transport::Unknown,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        common::query_map(&url),
+        uri,
+    );
+    config.id = format!("{scheme}://{}:{}", config.host, config.port);
+    config.metadata.source_url = source.map(|source| source.to_string());
     config.metadata.depth = depth;
     Ok(config)
 }

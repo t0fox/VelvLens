@@ -71,4 +71,18 @@ fn is_useful_decoded(text: &str) -> bool {
         || trimmed.starts_with('{')
         || trimmed.starts_with('[')
         || trimmed.starts_with('<')
+        || contains_uri_scheme(trimmed)
+}
+
+fn contains_uri_scheme(text: &str) -> bool {
+    text.lines().any(|line| {
+        line.split_once("://").is_some_and(|(scheme, remainder)| {
+            !remainder.is_empty()
+                && !scheme.is_empty()
+                && scheme.chars().enumerate().all(|(index, character)| {
+                    character.is_ascii_alphanumeric()
+                        || matches!(character, '+' | '-' | '.') && index > 0
+                })
+        })
+    })
 }

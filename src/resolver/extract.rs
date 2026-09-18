@@ -64,10 +64,7 @@ fn collect_json_strings(value: &Value, sources: &mut Vec<String>) {
 fn extract_regex_matches(source: &str, result: &mut ExtractionResult) {
     static CANDIDATE_RE: OnceLock<Regex> = OnceLock::new();
     let regex = CANDIDATE_RE.get_or_init(|| {
-        Regex::new(
-            r#"(?i)(?:vless|vmess|trojan|ss|hysteria|hysteria2|hy2|tuic|https?)://[^\s<>'\"`]+"#,
-        )
-        .expect("candidate regex is valid")
+        Regex::new(r#"(?i)(?:[a-z][a-z0-9+.-]*)://[^\s<>'\"`]+"#).expect("candidate regex is valid")
     });
 
     for matched in regex.find_iter(source) {

@@ -13,7 +13,10 @@ fn background_job_reports_invalid_input_without_blocking_the_caller() {
     while let Ok(event) = handle.receiver.recv_timeout(Duration::from_secs(2)) {
         let done = matches!(
             event,
-            JobEvent::Failed(_) | JobEvent::Cancelled | JobEvent::Completed(_)
+            JobEvent::Failed(_)
+                | JobEvent::Cancelled
+                | JobEvent::Completed(_)
+                | JobEvent::DiagnosticCompleted(_)
         );
         events.push(format!("{event:?}"));
         if done {

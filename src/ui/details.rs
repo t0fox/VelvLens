@@ -9,7 +9,9 @@ pub fn show(
     config: &ProxyConfig,
     show_sensitive: bool,
     qr: &mut Option<QrMatrix>,
-) {
+    diagnostic: Option<&crate::diagnostics::DiagnosticResult>,
+) -> bool {
+    let mut test = false;
     theme::surface_frame(theme::SURFACE).show(ui, |ui| {
         ui.horizontal(|ui| {
             protocol_badge(ui, config.protocol.as_str());
@@ -75,6 +77,15 @@ pub fn show(
                 .clicked()
             {
                 *qr = Some(crate::qr::encode(&config.raw_uri));
+            }
+            if ui
+                .add_sized(
+                    [88.0, 34.0],
+                    egui::Button::new("Test").fill(theme::SURFACE_RAISED),
+                )
+                .clicked()
+            {
+                test = true;
             }
         });
         ui.add_space(12.0);
@@ -156,7 +167,59 @@ pub fn show(
                         .interactive(false),
                 );
             });
+        if let Some(result) = diagnostic {
+            ui.add_space(12.0);
+            ui.separator();
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new("CONNECTIVITY CHECK")
+                    .size(10.0)
+                    .strong()
+                    .color(theme::MUTED),
+            );
+            ui.add_space(6.0);
+            ui.horizontal_wrapped(|ui| {
+                status_badge(ui, "DNS", &result.dns);
+                status_badge(ui, "TCP", &result.tcp);
+                if let Some(latency) = result.latency_ms {
+                    theme::badge(
+                        ui,
+                        &format!("{latency} ms"),
+                        theme::SURFACE_RAISED,
+                        theme::TEXT,
+                    );
+                }
+            });
+            ui.add_space(5.0);
+            ui.label(
+                egui::RichText::new("Connectivity only — this does not test the proxy protocol.")
+                    .size(11.0)
+                    .color(theme::MUTED),
+            );
+        }
     });
+    test
+}
+
+fn status_badge(ui: &mut egui::Ui, label: &str, status: &crate::diagnostics::CheckStatus) {
+    let (text, fill, color) = match status {
+        crate::diagnostics::CheckStatus::Passed => (
+            format!("{label}  PASS"),
+            theme::SUCCESS,
+            egui::Color32::WHITE,
+        ),
+        crate::diagnostics::CheckStatus::Failed(error) => (
+            format!("{label}  FAIL: {}", compact_value(error, 28)),
+            egui::Color32::from_rgba_unmultiplied(241, 107, 107, 35),
+            theme::ERROR,
+        ),
+        crate::diagnostics::CheckStatus::Skipped => (
+            format!("{label}  SKIPPED"),
+            theme::SURFACE_RAISED,
+            theme::MUTED,
+        ),
+    };
+    theme::badge(ui, &text, fill, color);
 }
 
 fn protocol_badge(ui: &mut egui::Ui, protocol: &str) {

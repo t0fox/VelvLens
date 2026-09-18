@@ -15,13 +15,14 @@ pub enum Protocol {
 }
 
 impl Protocol {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Vless,
         Self::Vmess,
         Self::Trojan,
         Self::Shadowsocks,
         Self::Hysteria2,
         Self::Tuic,
+        Self::Unknown,
     ];
 
     pub const fn as_str(self) -> &'static str {

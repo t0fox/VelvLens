@@ -1,6 +1,10 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
 use crate::{
+    diagnostics::DiagnosticResult,
     history::HistoryStore,
     jobs::{JobEvent, JobHandle, JobManager},
     model::Protocol,
@@ -10,6 +14,7 @@ use crate::{
 };
 use eframe::egui;
 
+use crate::ui::main_view::{ConnectivityFilter, DuplicateFilter};
 use crate::ui::theme;
 
 pub struct SubLensApp {
@@ -17,15 +22,23 @@ pub struct SubLensApp {
     status: String,
     job_manager: JobManager,
     job: Option<JobHandle>,
+    diagnostic_job: Option<JobHandle>,
+    diagnostic_target: Option<usize>,
     report: Option<AnalysisReport>,
     selected: Option<usize>,
     protocol_filters: HashSet<Protocol>,
     selected_configs: HashSet<usize>,
     search: String,
+    security_filter: Option<crate::model::Security>,
+    transport_filter: Option<crate::model::Transport>,
+    connectivity_filter: ConnectivityFilter,
+    duplicate_filter: DuplicateFilter,
     settings: AppSettings,
     history: HistoryStore,
     show_settings: bool,
+    show_export: bool,
     qr: Option<crate::qr::QrMatrix>,
+    diagnostics: HashMap<usize, DiagnosticResult>,
 }
 
 impl SubLensApp {
@@ -36,15 +49,23 @@ impl SubLensApp {
             status: "Ready · all analysis stays local".to_owned(),
             job_manager: JobManager::new().expect("Tokio runtime must start"),
             job: None,
+            diagnostic_job: None,
+            diagnostic_target: None,
             report: None,
             selected: None,
             protocol_filters: HashSet::new(),
             selected_configs: HashSet::new(),
             search: String::new(),
+            security_filter: None,
+            transport_filter: None,
+            connectivity_filter: ConnectivityFilter::All,
+            duplicate_filter: DuplicateFilter::All,
             settings: AppSettings::default(),
             history: HistoryStore::load(false),
             show_settings: false,
+            show_export: false,
             qr: None,
+            diagnostics: HashMap::new(),
         }
     }
 
@@ -55,9 +76,20 @@ impl SubLensApp {
             return;
         }
         self.report = None;
+        self.show_export = false;
         self.selected = None;
         self.protocol_filters.clear();
         self.selected_configs.clear();
+        self.security_filter = None;
+        self.transport_filter = None;
+        self.connectivity_filter = ConnectivityFilter::All;
+        self.duplicate_filter = DuplicateFilter::All;
+        self.diagnostics.clear();
+        if let Some(job) = &self.diagnostic_job {
+            job.cancel.cancel();
+        }
+        self.diagnostic_job = None;
+        self.diagnostic_target = None;
         if self.settings.history_enabled {
             self.history = HistoryStore::load(true);
             self.history.append(&url);
@@ -91,6 +123,7 @@ impl SubLensApp {
                     self.status = "Analysis cancelled".to_owned();
                     finished = true;
                 }
+                JobEvent::DiagnosticCompleted(_) => {}
             }
         }
         if finished {
@@ -98,11 +131,64 @@ impl SubLensApp {
         }
         ctx.request_repaint_after(Duration::from_millis(50));
     }
+
+    fn poll_diagnostic_job(&mut self, ctx: &egui::Context) {
+        let Some(job) = &self.diagnostic_job else {
+            return;
+        };
+        let mut finished = false;
+        while let Ok(event) = job.receiver.try_recv() {
+            match event {
+                JobEvent::DiagnosticCompleted(result) => {
+                    if let Some(index) = self.diagnostic_target {
+                        self.diagnostics.insert(index, result);
+                    }
+                    self.status = "Connectivity check complete · DNS/TCP only".to_owned();
+                    finished = true;
+                }
+                JobEvent::Failed(error) => {
+                    self.status = format!("Connectivity check failed: {error}");
+                    finished = true;
+                }
+                JobEvent::Cancelled => {
+                    self.status = "Connectivity check cancelled".to_owned();
+                    finished = true;
+                }
+                JobEvent::Started | JobEvent::Completed(_) => {}
+            }
+        }
+        if finished {
+            self.diagnostic_job = None;
+            self.diagnostic_target = None;
+        }
+        ctx.request_repaint_after(Duration::from_millis(50));
+    }
+
+    fn start_diagnostic(&mut self, index: usize) {
+        let Some(config) = self
+            .report
+            .as_ref()
+            .and_then(|report| report.configs.get(index))
+            .cloned()
+        else {
+            return;
+        };
+        if let Some(job) = &self.diagnostic_job {
+            job.cancel.cancel();
+        }
+        self.status = "Testing connectivity · DNS → TCP…".to_owned();
+        self.diagnostic_job = Some(
+            self.job_manager
+                .start_diagnostic(config, Duration::from_secs(self.settings.timeout_seconds)),
+        );
+        self.diagnostic_target = Some(index);
+    }
 }
 
 impl eframe::App for SubLensApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_job(ctx);
+        self.poll_diagnostic_job(ctx);
         let running = self.job.is_some();
         if self.show_settings {
             egui::Window::new("Settings")
@@ -114,6 +200,93 @@ impl eframe::App for SubLensApp {
                     }
                 });
         }
+        if self.show_export {
+            let mut close_export = false;
+            egui::Window::new("Export configurations")
+                .collapsible(false)
+                .resizable(false)
+                .frame(theme::surface_frame(theme::SURFACE))
+                .show(ctx, |ui| {
+                    if let Some(report) = &self.report {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{} configurations · choose a local export",
+                                report.configs.len()
+                            ))
+                            .size(12.0)
+                            .color(theme::MUTED),
+                        );
+                        ui.add_space(10.0);
+                        if ui
+                            .add_sized(
+                                [250.0, 34.0],
+                                egui::Button::new("Copy raw URI list").fill(theme::SURFACE_RAISED),
+                            )
+                            .clicked()
+                        {
+                            ui::details::copy_to_clipboard(&crate::export::raw_lines(
+                                &report.configs,
+                            ));
+                        }
+                        if ui
+                            .add_sized(
+                                [250.0, 34.0],
+                                egui::Button::new("Copy for v2rayN").fill(theme::ACCENT),
+                            )
+                            .clicked()
+                        {
+                            ui::details::copy_to_clipboard(&crate::export::v2rayn_bulk(
+                                &report.configs,
+                            ));
+                        }
+                        if ui
+                            .add_sized(
+                                [250.0, 34.0],
+                                egui::Button::new("Copy Base64 subscription")
+                                    .fill(theme::SURFACE_RAISED),
+                            )
+                            .clicked()
+                        {
+                            ui::details::copy_to_clipboard(&crate::export::base64_subscription(
+                                &report.configs,
+                            ));
+                        }
+                        if ui
+                            .add_sized(
+                                [250.0, 34.0],
+                                egui::Button::new("Copy sanitized JSON")
+                                    .fill(theme::SURFACE_RAISED),
+                            )
+                            .clicked()
+                        {
+                            if let Ok(json) = crate::export::json_dump(&report.configs, false) {
+                                ui::details::copy_to_clipboard(&json);
+                            }
+                        }
+                        ui.add_space(8.0);
+                        ui.label(
+                            egui::RichText::new(
+                                "Raw exports include credentials only after this explicit action.",
+                            )
+                            .size(11.0)
+                            .color(theme::MUTED),
+                        );
+                    }
+                    ui.add_space(10.0);
+                    if ui
+                        .add_sized(
+                            [250.0, 34.0],
+                            egui::Button::new("Close").fill(theme::SURFACE_RAISED),
+                        )
+                        .clicked()
+                    {
+                        close_export = true;
+                    }
+                });
+            if close_export {
+                self.show_export = false;
+            }
+        }
         let result = ui::main_view::show(
             ctx,
             &mut self.input,
@@ -123,13 +296,21 @@ impl eframe::App for SubLensApp {
             &mut self.protocol_filters,
             &mut self.selected_configs,
             &mut self.search,
+            &mut self.security_filter,
+            &mut self.transport_filter,
+            &mut self.connectivity_filter,
+            &mut self.duplicate_filter,
             running,
             &self.status,
             self.settings.show_sensitive_session,
             &mut self.qr,
+            &self.diagnostics,
         );
         if result.open_settings {
             self.show_settings = true;
+        }
+        if result.open_export {
+            self.show_export = true;
         }
         if result.analyze {
             self.start();
@@ -138,6 +319,9 @@ impl eframe::App for SubLensApp {
             if let Some(job) = &self.job {
                 job.cancel.cancel();
             }
+        }
+        if let Some(index) = result.test {
+            self.start_diagnostic(index);
         }
         if result.copy_all {
             if let Some(report) = &self.report {

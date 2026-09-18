@@ -98,6 +98,21 @@ fn extracts_legacy_hysteria_alias_and_case_insensitive_schemes() {
 }
 
 #[test]
+fn preserves_unknown_uri_candidates_for_inspection() {
+    let result = extract_items("torrent://tracker.example:6969#sample\n", ContentKind::Text);
+    assert_eq!(
+        result.proxy_uris,
+        vec!["torrent://tracker.example:6969#sample"]
+    );
+
+    let config = sublens::protocols::parse_uri(&result.proxy_uris[0], None, 0).unwrap();
+    assert_eq!(config.protocol, sublens::model::Protocol::Unknown);
+    assert_eq!(config.host, "tracker.example");
+    assert_eq!(config.port, 6969);
+    assert_eq!(config.name.as_deref(), Some("sample"));
+}
+
+#[test]
 fn failed_stage_redacts_uri_credentials() {
     let stage = sublens::resolver::stage::PipelineStage::failure(
         sublens::resolver::stage::StageKind::Parse,

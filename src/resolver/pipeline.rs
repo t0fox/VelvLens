@@ -13,7 +13,7 @@ use crate::{
     dedup::{deduplicate, DuplicateReport},
     error::{Result, SubLensError},
     model::ProxyConfig,
-    protocols::{is_supported_scheme, parse_uri},
+    protocols::parse_uri,
 };
 
 use super::{
@@ -245,9 +245,6 @@ fn process_inline(
                 "more than {} configurations",
                 config.max_configs
             )));
-        }
-        if !is_supported_scheme(&uri) {
-            continue;
         }
         match parse_uri(&uri, Some(source), depth) {
             Ok(config) => report.configs.push(config),

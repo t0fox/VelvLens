@@ -2,15 +2,16 @@
 
 SubLens is a local Windows visual inspector for proxy subscription and share URLs. It resolves redirects and nested sources, decodes text/Base64/Base64URL/JSON/HTML payloads, parses proxy URIs into a normalized model, and shows the pipeline and configurations in a dark egui desktop interface.
 
-## Prototype workflow
+## Workflow
 
 1. Open SubLens.
 2. Paste a subscription or share URL.
 3. Select **Analyze**.
 4. Review the HTTP → Decode → Extract → Parse stages.
 5. Select a card to open the Inspector; use the visible **Copy URI**, **Copy safe**, or **QR** actions.
-6. Select protocol categories, use **Select visible**, or check individual cards.
-7. Use **Copy selected** or **Copy all** and paste the result into v2rayN's **Import bulk URL from clipboard** action.
+6. Select protocol categories, combine Security/Transport/Status/Duplicates filters, use **Select visible**, or check individual cards.
+7. Use **Test** for local DNS/TCP connectivity evidence, or **Export** for raw URI, v2rayN, Base64, and sanitized JSON output.
+8. Use **Copy selected** or **Copy for v2rayN** and paste the result into v2rayN's **Import bulk URL from clipboard** action.
 
 ## Supported content
 
@@ -21,7 +22,7 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 - HTML DOM text, links, attributes, scripts, and embedded JSON.
 - Nested subscription URLs with loop/depth/byte/count limits.
 
-Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Hysteria/Hysteria2/Hy2, and TUIC. Unknown content is reported in the pipeline and does not crash the application.
+Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Hysteria/Hysteria2/Hy2, and TUIC. Unknown URI schemes are preserved as inspectable **Unknown** configurations instead of being silently discarded.
 
 The catalog supports multiple protocol filters at once. The name/host search accepts exclusion terms such as `-LTE` or `-Torrent`, so unwanted categories can be left out before using **Select visible**.
 

@@ -1,9 +1,16 @@
-use std::sync::mpsc::{self, Receiver};
+use std::{
+    sync::mpsc::{self, Receiver},
+    time::Duration,
+};
 
 use tokio::runtime::{Builder, Runtime};
 use tokio_util::sync::CancellationToken;
 
-use crate::resolver::{AnalysisReport, Resolver, ResolverConfig};
+use crate::{
+    diagnostics::DiagnosticResult,
+    model::ProxyConfig,
+    resolver::{AnalysisReport, Resolver, ResolverConfig},
+};
 
 #[derive(Debug)]
 pub enum JobEvent {
@@ -11,6 +18,7 @@ pub enum JobEvent {
     Completed(AnalysisReport),
     Failed(String),
     Cancelled,
+    DiagnosticCompleted(DiagnosticResult),
 }
 
 pub struct JobHandle {
@@ -38,6 +46,26 @@ impl JobManager {
             match resolver.analyze(&url, child.clone()).await {
                 Ok(report) => {
                     let _ = sender.send(JobEvent::Completed(report));
+                }
+                Err(crate::error::SubLensError::Cancelled) => {
+                    let _ = sender.send(JobEvent::Cancelled);
+                }
+                Err(error) => {
+                    let _ = sender.send(JobEvent::Failed(error.to_string()));
+                }
+            }
+        });
+        JobHandle { receiver, cancel }
+    }
+
+    pub fn start_diagnostic(&self, config: ProxyConfig, request_timeout: Duration) -> JobHandle {
+        let (sender, receiver) = mpsc::channel();
+        let cancel = CancellationToken::new();
+        let child = cancel.clone();
+        self.runtime.spawn(async move {
+            match crate::diagnostics::check(&config, request_timeout, &child).await {
+                Ok(result) => {
+                    let _ = sender.send(JobEvent::DiagnosticCompleted(result));
                 }
                 Err(crate::error::SubLensError::Cancelled) => {
                     let _ = sender.send(JobEvent::Cancelled);

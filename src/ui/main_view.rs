@@ -1,8 +1,12 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use eframe::egui;
 
-use crate::{model::Protocol, resolver::AnalysisReport};
+use crate::{
+    diagnostics::{CheckStatus, DiagnosticResult},
+    model::{Protocol, Security, Transport},
+    resolver::AnalysisReport,
+};
 
 use super::{config_card, details, inspector, theme};
 
@@ -13,6 +17,25 @@ pub struct MainViewResult {
     pub copy_all: bool,
     pub copy_selected: bool,
     pub open_settings: bool,
+    pub open_export: bool,
+    pub test: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConnectivityFilter {
+    #[default]
+    All,
+    Passed,
+    Failed,
+    NotChecked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DuplicateFilter {
+    #[default]
+    All,
+    Unique,
+    Duplicates,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -25,10 +48,15 @@ pub fn show(
     protocol_filters: &mut HashSet<Protocol>,
     selected_configs: &mut HashSet<usize>,
     search: &mut String,
+    security_filter: &mut Option<Security>,
+    transport_filter: &mut Option<Transport>,
+    connectivity_filter: &mut ConnectivityFilter,
+    duplicate_filter: &mut DuplicateFilter,
     running: bool,
     status: &str,
     show_sensitive: bool,
     qr: &mut Option<crate::qr::QrMatrix>,
+    diagnostics: &HashMap<usize, crate::diagnostics::DiagnosticResult>,
 ) -> MainViewResult {
     let mut result = MainViewResult {
         analyze: false,
@@ -37,6 +65,8 @@ pub fn show(
         copy_all: false,
         copy_selected: false,
         open_settings: false,
+        open_export: false,
+        test: None,
     };
 
     egui::TopBottomPanel::top("header")
@@ -58,6 +88,18 @@ pub fn show(
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let export = ui
+                        .add_enabled_ui(report.is_some(), |ui| {
+                            ui.add_sized(
+                                [82.0, 34.0],
+                                egui::Button::new(egui::RichText::new("Export").size(12.0))
+                                    .fill(theme::SURFACE_RAISED),
+                            )
+                        })
+                        .inner;
+                    if export.clicked() {
+                        result.open_export = true;
+                    }
                     let settings = ui.add_sized(
                         [92.0, 34.0],
                         egui::Button::new(egui::RichText::new("Settings").size(12.0))
@@ -196,6 +238,40 @@ pub fn show(
                     }
                 });
                 ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    security_filter_combo(
+                        ui,
+                        security_filter,
+                        &[
+                            Security::Reality,
+                            Security::Tls,
+                            Security::None,
+                            Security::Unknown,
+                        ],
+                    );
+                    transport_filter_combo(
+                        ui,
+                        transport_filter,
+                        &[
+                            Transport::Tcp,
+                            Transport::XHttp,
+                            Transport::WebSocket,
+                            Transport::Grpc,
+                            Transport::Http2,
+                            Transport::Quic,
+                            Transport::Unknown,
+                        ],
+                    );
+                    connectivity_filter_combo(ui, connectivity_filter);
+                    duplicate_filter_combo(ui, duplicate_filter);
+                });
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new("Filter configurations")
+                        .size(10.0)
+                        .strong()
+                        .color(theme::MUTED),
+                );
                 let search_width = ui.available_width();
                 ui.add_sized(
                     [search_width, 32.0],
@@ -207,7 +283,19 @@ pub fn show(
                     .configs
                     .iter()
                     .enumerate()
-                    .filter(|(_, config)| is_visible(config, protocol_filters, &search_query))
+                    .filter(|(index, config)| {
+                        is_visible(
+                            *index,
+                            config,
+                            protocol_filters,
+                            *security_filter,
+                            *transport_filter,
+                            *connectivity_filter,
+                            *duplicate_filter,
+                            diagnostics,
+                            &search_query,
+                        )
+                    })
                     .map(|(index, _)| index)
                     .collect::<Vec<_>>();
                 ui.add_space(8.0);
@@ -244,8 +332,43 @@ pub fn show(
                     if copy_selected.clicked() {
                         result.copy_selected = true;
                     }
+                    let filters_active = !protocol_filters.is_empty()
+                        || security_filter.is_some()
+                        || transport_filter.is_some()
+                        || !matches!(connectivity_filter, ConnectivityFilter::All)
+                        || !matches!(duplicate_filter, DuplicateFilter::All)
+                        || !search.trim().is_empty();
+                    if ui
+                        .add_enabled(
+                            filters_active,
+                            egui::Button::new("Reset filters").fill(theme::SURFACE_RAISED),
+                        )
+                        .clicked()
+                    {
+                        protocol_filters.clear();
+                        *security_filter = None;
+                        *transport_filter = None;
+                        *connectivity_filter = ConnectivityFilter::All;
+                        *duplicate_filter = DuplicateFilter::All;
+                        search.clear();
+                    }
                 });
                 ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new("Configuration list")
+                            .size(10.0)
+                            .strong()
+                            .color(theme::MUTED),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            egui::RichText::new(format!("{} visible", visible_indices.len()))
+                                .size(10.0)
+                                .color(theme::MUTED),
+                        );
+                    });
+                });
                 let list_height = ui.available_height().max(1.0);
                 ui.allocate_ui_with_layout(
                     egui::vec2(ui.available_width(), list_height),
@@ -311,16 +434,33 @@ pub fn show(
             if let Some(report) = report {
                 if let Some(index) = *selected {
                     if let Some(config) = report.configs.get(index) {
-                        let content_width = ui.available_width().min(920.0);
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(content_width, ui.available_height()),
-                            egui::Layout::top_down(egui::Align::Min),
-                            |ui| details::show(ui, config, show_sensitive, qr),
-                        );
-                        ui.add_space(12.0);
-                        egui::CollapsingHeader::new("Decode pipeline")
-                            .default_open(false)
-                            .show(ui, |ui| inspector::show_stages(ui, report));
+                        // Salt the scroll state with the selected index. A newly selected
+                        // profile always opens at its header, while long details remain scrollable.
+                        egui::ScrollArea::vertical()
+                            .id_salt(("workspace-inspector", index))
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                let content_width = ui.available_width().min(920.0);
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(content_width, ui.available_height()),
+                                    egui::Layout::top_down(egui::Align::Min),
+                                    |ui| {
+                                        if details::show(
+                                            ui,
+                                            config,
+                                            show_sensitive,
+                                            qr,
+                                            diagnostics.get(&index),
+                                        ) {
+                                            result.test = Some(index);
+                                        }
+                                    },
+                                );
+                                ui.add_space(12.0);
+                                egui::CollapsingHeader::new("Decode pipeline")
+                                    .default_open(false)
+                                    .show(ui, |ui| inspector::show_stages(ui, report));
+                            });
                     }
                 } else {
                     inspector::show(ui, report);
@@ -397,21 +537,155 @@ fn filter_button(
     }
 }
 
+fn security_filter_combo(ui: &mut egui::Ui, current: &mut Option<Security>, values: &[Security]) {
+    egui::ComboBox::from_id_salt("security-filter")
+        .selected_text(format!(
+            "Security: {}",
+            current.map(Security::as_str).unwrap_or("All")
+        ))
+        .width(110.0)
+        .show_ui(ui, |ui| {
+            if ui.selectable_label(current.is_none(), "All").clicked() {
+                *current = None;
+            }
+            for value in values {
+                if ui
+                    .selectable_label(*current == Some(*value), value.as_str())
+                    .clicked()
+                {
+                    *current = Some(*value);
+                }
+            }
+        });
+}
+
+fn transport_filter_combo(
+    ui: &mut egui::Ui,
+    current: &mut Option<Transport>,
+    values: &[Transport],
+) {
+    egui::ComboBox::from_id_salt("transport-filter")
+        .selected_text(format!(
+            "Transport: {}",
+            current.map(Transport::as_str).unwrap_or("All")
+        ))
+        .width(110.0)
+        .show_ui(ui, |ui| {
+            if ui.selectable_label(current.is_none(), "All").clicked() {
+                *current = None;
+            }
+            for value in values {
+                if ui
+                    .selectable_label(*current == Some(*value), value.as_str())
+                    .clicked()
+                {
+                    *current = Some(*value);
+                }
+            }
+        });
+}
+
+fn connectivity_filter_combo(ui: &mut egui::Ui, current: &mut ConnectivityFilter) {
+    egui::ComboBox::from_id_salt("connectivity-filter")
+        .selected_text(format!(
+            "Status: {}",
+            match current {
+                ConnectivityFilter::All => "All",
+                ConnectivityFilter::Passed => "Passed",
+                ConnectivityFilter::Failed => "Failed",
+                ConnectivityFilter::NotChecked => "Not tested",
+            }
+        ))
+        .width(110.0)
+        .show_ui(ui, |ui| {
+            for (value, label) in [
+                (ConnectivityFilter::All, "All"),
+                (ConnectivityFilter::Passed, "Passed"),
+                (ConnectivityFilter::Failed, "Failed"),
+                (ConnectivityFilter::NotChecked, "Not tested"),
+            ] {
+                if ui.selectable_label(*current == value, label).clicked() {
+                    *current = value;
+                }
+            }
+        });
+}
+
+fn duplicate_filter_combo(ui: &mut egui::Ui, current: &mut DuplicateFilter) {
+    egui::ComboBox::from_id_salt("duplicate-filter")
+        .selected_text(format!(
+            "Duplicates: {}",
+            match current {
+                DuplicateFilter::All => "All",
+                DuplicateFilter::Unique => "Unique",
+                DuplicateFilter::Duplicates => "Duplicates",
+            }
+        ))
+        .width(110.0)
+        .show_ui(ui, |ui| {
+            for (value, label) in [
+                (DuplicateFilter::All, "All"),
+                (DuplicateFilter::Unique, "Unique"),
+                (DuplicateFilter::Duplicates, "Duplicates"),
+            ] {
+                if ui.selectable_label(*current == value, label).clicked() {
+                    *current = value;
+                }
+            }
+        });
+}
+
+#[allow(clippy::too_many_arguments)]
 fn is_visible(
+    index: usize,
     config: &crate::model::ProxyConfig,
     protocol_filters: &HashSet<Protocol>,
+    security_filter: Option<Security>,
+    transport_filter: Option<Transport>,
+    connectivity_filter: ConnectivityFilter,
+    duplicate_filter: DuplicateFilter,
+    diagnostics: &HashMap<usize, DiagnosticResult>,
     search_query: &str,
 ) -> bool {
     if !protocol_filters.is_empty() && !protocol_filters.contains(&config.protocol) {
         return false;
     }
+    if security_filter.is_some_and(|security| config.security != security)
+        || transport_filter.is_some_and(|transport| config.transport != transport)
+    {
+        return false;
+    }
+    let is_duplicate = config.metadata.exact_duplicate_count > 1
+        || config.metadata.semantic_duplicate_group.is_some();
+    if matches!(duplicate_filter, DuplicateFilter::Unique) && is_duplicate
+        || matches!(duplicate_filter, DuplicateFilter::Duplicates) && !is_duplicate
+    {
+        return false;
+    }
+    match connectivity_filter {
+        ConnectivityFilter::All => {}
+        ConnectivityFilter::NotChecked if diagnostics.contains_key(&index) => return false,
+        ConnectivityFilter::NotChecked => {}
+        ConnectivityFilter::Passed => {
+            if !diagnostics.get(&index).is_some_and(diagnostic_passed) {
+                return false;
+            }
+        }
+        ConnectivityFilter::Failed => {
+            if !diagnostics.get(&index).is_some_and(diagnostic_failed) {
+                return false;
+            }
+        }
+    }
     if search_query.is_empty() {
         return true;
     }
     let haystack = format!(
-        "{} {}",
+        "{} {} {} {}",
         config.name.as_deref().unwrap_or_default(),
-        config.host
+        config.host,
+        config.protocol.as_str(),
+        config.raw_uri
     )
     .to_ascii_lowercase();
     search_query.split_whitespace().all(|term| {
@@ -421,6 +695,14 @@ fn is_visible(
             haystack.contains(term)
         }
     })
+}
+
+fn diagnostic_passed(result: &DiagnosticResult) -> bool {
+    matches!(result.dns, CheckStatus::Passed) && matches!(result.tcp, CheckStatus::Passed)
+}
+
+fn diagnostic_failed(result: &DiagnosticResult) -> bool {
+    matches!(result.dns, CheckStatus::Failed(_)) || matches!(result.tcp, CheckStatus::Failed(_))
 }
 
 fn empty_state(ui: &mut egui::Ui, status: &str, running: bool) {
