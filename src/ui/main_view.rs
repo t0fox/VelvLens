@@ -132,9 +132,9 @@ pub fn show(
 
     egui::SidePanel::left("catalog")
         .resizable(true)
-        .default_width(382.0)
-        .min_width(320.0)
-        .max_width(460.0)
+        .default_width(344.0)
+        .min_width(300.0)
+        .max_width(420.0)
         .frame(theme::surface_frame(theme::SURFACE))
         .show(ctx, |ui| {
             if let Some(report) = report {
@@ -158,22 +158,17 @@ pub fn show(
                     });
                 });
                 ui.add_space(10.0);
-                egui::ScrollArea::horizontal()
-                    .id_salt("protocol-filters")
-                    .auto_shrink([false, true])
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            filter_button(ui, "All", report.configs.len(), filter, None);
-                            for protocol in Protocol::ALL {
-                                let count = report
-                                    .configs
-                                    .iter()
-                                    .filter(|config| config.protocol == protocol)
-                                    .count();
-                                filter_button(ui, protocol.as_str(), count, filter, Some(protocol));
-                            }
-                        });
-                    });
+                ui.horizontal_wrapped(|ui| {
+                    filter_button(ui, "All", report.configs.len(), filter, None);
+                    for protocol in Protocol::ALL {
+                        let count = report
+                            .configs
+                            .iter()
+                            .filter(|config| config.protocol == protocol)
+                            .count();
+                        filter_button(ui, protocol.as_str(), count, filter, Some(protocol));
+                    }
+                });
                 ui.add_space(8.0);
                 let search_width = ui.available_width();
                 ui.add_sized(
@@ -226,7 +221,9 @@ pub fn show(
                 .inner_margin(egui::Margin::same(18.0)),
         )
         .show(ctx, |ui| {
-            theme::draw_network_backdrop(ui);
+            if report.is_none() {
+                theme::draw_network_backdrop(ui);
+            }
             if let Some(report) = report {
                 if let Some(index) = *selected {
                     if let Some(config) = report.configs.get(index) {
@@ -245,7 +242,7 @@ pub fn show(
                     inspector::show(ui, report);
                 }
             } else {
-                empty_state(ui);
+                empty_state(ui, status, running);
             }
         });
 
@@ -293,8 +290,15 @@ fn filter_button(
     } else {
         theme::MUTED
     };
+    let width = match label {
+        "All" => 76.0,
+        "VLESS" | "VMess" | "Trojan" | "TUIC" => 92.0,
+        "Hysteria2" => 112.0,
+        "Shadowsocks" => 128.0,
+        _ => 96.0,
+    };
     let response = ui.add_sized(
-        [76.0, 30.0],
+        [width, 30.0],
         egui::Button::new(
             egui::RichText::new(format!("{label}  {count}"))
                 .size(11.0)
@@ -308,25 +312,59 @@ fn filter_button(
     }
 }
 
-fn empty_state(ui: &mut egui::Ui) {
+fn empty_state(ui: &mut egui::Ui, status: &str, running: bool) {
     theme::surface_frame(theme::SURFACE).show(ui, |ui| {
         ui.vertical_centered(|ui| {
             ui.add_space(78.0);
             theme::draw_logo(ui);
             ui.add_space(14.0);
-            ui.label(
-                egui::RichText::new("Inspect a subscription locally")
-                    .size(22.0)
-                    .strong(),
-            );
-            ui.add_space(6.0);
-            ui.label(
-                egui::RichText::new(
-                    "Paste a source above to see its decode and extraction stages.",
-                )
-                .size(13.0)
-                .color(theme::MUTED),
-            );
+            if running {
+                ui.spinner();
+                ui.add_space(10.0);
+                ui.label(egui::RichText::new("Inspecting source").size(22.0).strong());
+                ui.add_space(6.0);
+                ui.label(
+                    egui::RichText::new("Fetching and decoding locally. This can take a moment.")
+                        .size(13.0)
+                        .color(theme::MUTED),
+                );
+            } else if let Some(error) = status.strip_prefix("Analysis failed: ") {
+                egui::Frame::none()
+                    .fill(egui::Color32::from_rgba_unmultiplied(241, 107, 107, 20))
+                    .stroke(egui::Stroke::new(1.0_f32, theme::ERROR))
+                    .rounding(egui::Rounding::same(8.0))
+                    .inner_margin(egui::Margin::symmetric(14.0, 10.0))
+                    .show(ui, |ui| {
+                        ui.label(
+                            egui::RichText::new("Analysis couldn't complete")
+                                .size(16.0)
+                                .strong()
+                                .color(theme::ERROR),
+                        );
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new(error).size(12.0).color(theme::MUTED));
+                    });
+                ui.add_space(12.0);
+                ui.label(
+                    egui::RichText::new("Check the source URL and try Analyze again.")
+                        .size(13.0)
+                        .color(theme::MUTED),
+                );
+            } else {
+                ui.label(
+                    egui::RichText::new("Inspect a subscription locally")
+                        .size(22.0)
+                        .strong(),
+                );
+                ui.add_space(6.0);
+                ui.label(
+                    egui::RichText::new(
+                        "Paste a source above to see its decode and extraction stages.",
+                    )
+                    .size(13.0)
+                    .color(theme::MUTED),
+                );
+            }
             ui.add_space(78.0);
         });
     });

@@ -26,6 +26,15 @@ impl TestServer {
         let address = listener.local_addr().unwrap().to_string();
         let (shutdown, mut stop) = oneshot::channel();
         let encoded = STANDARD.encode("trojan://synthetic-password@nested.example:443");
+        let wrapped =
+            STANDARD.encode("vless://12345678-1234-1234-1234-123456789abc@wrapped.example:443");
+        let wrapped = wrapped
+            .as_bytes()
+            .chunks(19)
+            .map(std::str::from_utf8)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join("\n");
         let body = format!(
             "{{\"items\":[\"vless://12345678-1234-1234-1234-123456789abc@direct.example:443\",\"{}\"]}}",
             encoded
@@ -46,6 +55,14 @@ impl TestServer {
             (
                 "/loop",
                 "HTTP/1.1 302 Found\r\nLocation: /loop\r\nContent-Length: 0\r\n\r\n".to_owned(),
+            ),
+            (
+                "/wrapped",
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                    wrapped.len(),
+                    wrapped
+                ),
             ),
         ]));
         tokio::spawn(async move {
@@ -111,6 +128,18 @@ async fn redirect_loop_is_bounded_by_redirect_limit() {
         .await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("redirect"));
+}
+
+#[tokio::test]
+async fn decodes_line_wrapped_base64_from_http_source() {
+    let server = TestServer::start().await;
+    let report = Resolver::new(reqwest::Client::new(), ResolverConfig::default())
+        .analyze(&server.url("/wrapped"), CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(report.configs.len(), 1);
+    assert_eq!(report.configs[0].protocol, Protocol::Vless);
 }
 
 #[test]

@@ -20,6 +20,23 @@ fn decodes_standard_and_unpadded_url_safe_base64() {
 }
 
 #[test]
+fn decodes_base64_with_line_wrapping() {
+    let value = "vless://12345678-1234-1234-1234-123456789abc@example.com:443";
+    let encoded = STANDARD.encode(value);
+    let wrapped = encoded
+        .as_bytes()
+        .chunks(17)
+        .map(std::str::from_utf8)
+        .collect::<Result<Vec<_>, _>>()
+        .expect("base64 chunks are valid UTF-8")
+        .join("\r\n  ");
+
+    assert!(decode_candidates(&wrapped)
+        .iter()
+        .any(|candidate| candidate.text.contains("vless://")));
+}
+
+#[test]
 fn detects_json_html_proxy_lists_and_base64_candidates() {
     assert_eq!(
         detect_content(

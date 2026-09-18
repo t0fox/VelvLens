@@ -16,21 +16,24 @@ pub struct DecodedCandidate {
 }
 
 pub fn decode_candidates(input: &str) -> Vec<DecodedCandidate> {
-    let normalized = input.trim();
+    let normalized = input
+        .chars()
+        .filter(|character| *character != '\u{feff}' && !character.is_ascii_whitespace())
+        .collect::<String>();
     if normalized.is_empty() || normalized.contains("://") {
         return Vec::new();
     }
 
     let attempts = [
-        (DecodeCodec::Standard, STANDARD.decode(normalized)),
+        (DecodeCodec::Standard, STANDARD.decode(&normalized)),
         (
             DecodeCodec::StandardNoPad,
-            STANDARD_NO_PAD.decode(normalized),
+            STANDARD_NO_PAD.decode(&normalized),
         ),
-        (DecodeCodec::UrlSafe, URL_SAFE.decode(normalized)),
+        (DecodeCodec::UrlSafe, URL_SAFE.decode(&normalized)),
         (
             DecodeCodec::UrlSafeNoPad,
-            URL_SAFE_NO_PAD.decode(normalized),
+            URL_SAFE_NO_PAD.decode(&normalized),
         ),
     ];
 

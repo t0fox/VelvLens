@@ -47,9 +47,49 @@ pub fn show(
                 theme::badge(ui, flow, theme::SURFACE_RAISED, theme::MUTED);
             }
         });
-        ui.add_space(14.0);
+        ui.add_space(12.0);
+        ui.horizontal(|ui| {
+            if ui
+                .add_sized(
+                    [132.0, 34.0],
+                    egui::Button::new(egui::RichText::new("Copy URI").strong()).fill(theme::ACCENT),
+                )
+                .clicked()
+            {
+                copy_to_clipboard(&config.raw_uri);
+            }
+            if ui
+                .add_sized(
+                    [122.0, 34.0],
+                    egui::Button::new("Copy safe").fill(theme::SURFACE_RAISED),
+                )
+                .clicked()
+            {
+                copy_to_clipboard(&redact_uri(&config.raw_uri));
+            }
+            if ui
+                .add_sized(
+                    [82.0, 34.0],
+                    egui::Button::new("QR").fill(theme::SURFACE_RAISED),
+                )
+                .clicked()
+            {
+                *qr = Some(crate::qr::encode(&config.raw_uri));
+            }
+        });
+        ui.add_space(12.0);
         ui.separator();
         ui.add_space(10.0);
+        ui.label(
+            egui::RichText::new("CONNECTION DETAILS")
+                .size(10.0)
+                .strong()
+                .color(theme::MUTED),
+        );
+        ui.add_space(8.0);
+        let address = compact_value(&config.host, 32);
+        let sni = compact_value(config.sni.as_deref().unwrap_or("—"), 24);
+        let fingerprint = compact_value(config.fingerprint.as_deref().unwrap_or("—"), 20);
         let public_key = compact_value(config.reality_public_key.as_deref().unwrap_or("—"), 28);
         let short_id = compact_value(config.reality_short_id.as_deref().unwrap_or("—"), 18);
         let uuid = if show_sensitive {
@@ -64,30 +104,24 @@ pub fn show(
         };
         egui::Grid::new(ui.id().with("configuration-fields"))
             .num_columns(4)
-            .spacing(egui::vec2(20.0, 14.0))
+            .spacing(egui::vec2(18.0, 10.0))
             .show(ui, |ui| {
                 detail_pair(
                     ui,
                     "Address",
-                    &config.host,
+                    &address,
                     "Transport",
                     config.transport.as_str(),
                 );
                 ui.end_row();
-                detail_pair(
-                    ui,
-                    "Port",
-                    &config.port.to_string(),
-                    "SNI",
-                    config.sni.as_deref().unwrap_or("—"),
-                );
+                detail_pair(ui, "Port", &config.port.to_string(), "SNI", &sni);
                 ui.end_row();
                 detail_pair(
                     ui,
                     "Security",
                     config.security.as_str(),
                     "Fingerprint",
-                    config.fingerprint.as_deref().unwrap_or("—"),
+                    &fingerprint,
                 );
                 ui.end_row();
                 detail_pair(ui, "Public key", &public_key, "Short ID", &short_id);
@@ -122,37 +156,6 @@ pub fn show(
                         .interactive(false),
                 );
             });
-        ui.add_space(10.0);
-        ui.horizontal(|ui| {
-            if ui
-                .add_sized(
-                    [190.0, 36.0],
-                    egui::Button::new(egui::RichText::new("Copy configuration").strong())
-                        .fill(theme::ACCENT),
-                )
-                .clicked()
-            {
-                copy_to_clipboard(&config.raw_uri);
-            }
-            if ui
-                .add_sized(
-                    [182.0, 36.0],
-                    egui::Button::new("Copy sanitized").fill(theme::SURFACE_RAISED),
-                )
-                .clicked()
-            {
-                copy_to_clipboard(&redact_uri(&config.raw_uri));
-            }
-            if ui
-                .add_sized(
-                    [108.0, 36.0],
-                    egui::Button::new("QR code").fill(theme::SURFACE_RAISED),
-                )
-                .clicked()
-            {
-                *qr = Some(crate::qr::encode(&config.raw_uri));
-            }
-        });
     });
 }
 
