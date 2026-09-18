@@ -1,0 +1,69 @@
+use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD};
+use base64::Engine;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecodeCodec {
+    Standard,
+    StandardNoPad,
+    UrlSafe,
+    UrlSafeNoPad,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodedCandidate {
+    pub codec: DecodeCodec,
+    pub text: String,
+}
+
+pub fn decode_candidates(input: &str) -> Vec<DecodedCandidate> {
+    let normalized = input.trim();
+    if normalized.is_empty() || normalized.contains("://") {
+        return Vec::new();
+    }
+
+    let attempts = [
+        (DecodeCodec::Standard, STANDARD.decode(normalized)),
+        (
+            DecodeCodec::StandardNoPad,
+            STANDARD_NO_PAD.decode(normalized),
+        ),
+        (DecodeCodec::UrlSafe, URL_SAFE.decode(normalized)),
+        (
+            DecodeCodec::UrlSafeNoPad,
+            URL_SAFE_NO_PAD.decode(normalized),
+        ),
+    ];
+
+    attempts
+        .into_iter()
+        .filter_map(|(codec, result)| {
+            let bytes = result.ok()?;
+            let text = String::from_utf8(bytes).ok()?;
+            is_useful_decoded(&text).then_some(DecodedCandidate { codec, text })
+        })
+        .fold(Vec::new(), |mut candidates, candidate| {
+            if !candidates
+                .iter()
+                .any(|seen: &DecodedCandidate| seen.text == candidate.text)
+            {
+                candidates.push(candidate);
+            }
+            candidates
+        })
+}
+
+fn is_useful_decoded(text: &str) -> bool {
+    let trimmed = text.trim();
+    trimmed.contains("vless://")
+        || trimmed.contains("vmess://")
+        || trimmed.contains("trojan://")
+        || trimmed.contains("ss://")
+        || trimmed.contains("hysteria2://")
+        || trimmed.contains("hy2://")
+        || trimmed.contains("tuic://")
+        || trimmed.contains("http://")
+        || trimmed.contains("https://")
+        || trimmed.starts_with('{')
+        || trimmed.starts_with('[')
+        || trimmed.starts_with('<')
+}

@@ -186,9 +186,9 @@ Unit tests cover redaction, URL canonicalization, Base64/Base64URL padding, dete
 
 Fixture integration tests cover raw VLESS, Base64 VLESS, Base64URL, VMess, Trojan, Shadowsocks, mixed protocols, malformed content, nested JSON/HTML, nested subscriptions, redirect chains, recursion loops, limits, and duplicates. Fixtures contain synthetic credentials only.
 
-A deterministic local mock HTTP server tests redirects, nested URLs, content types, timeout behavior, and loop protection. No test depends on `vlv.one`.
+A deterministic local mock HTTP server tests redirects, nested URLs, content types, timeout behavior, and loop protection. No test depends on a personal subscription URL.
 
-The optional live command fetches `https://vlv.one/1mmpadrrr1` and writes only status, content type, stage summaries, totals, and protocol counts. It must never write the subscription, raw URIs, UUIDs, or credentials to logs or fixtures.
+The optional live command fetches a user-supplied subscription URL and writes only status, content type, stage summaries, totals, and protocol counts. It must never write the subscription, raw URIs, UUIDs, or credentials to logs or fixtures.
 
 ## Delivery and acceptance
 

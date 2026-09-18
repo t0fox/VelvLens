@@ -1,0 +1,3 @@
+vless://12345678-1234-1234-1234-123456789abc@example.com:443
+trojan://synthetic-password@example.net:443
+ss://method:password@example.org:443

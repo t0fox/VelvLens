@@ -523,7 +523,7 @@ cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 cargo build --release
-cargo run --bin live_acceptance -- --url https://vlv.one/1mmpadrrr1
+cargo run --bin live_acceptance -- --url <your-subscription-url>
 ```
 
 Record the exact results without secrets. If the live source is unavailable, record the sanitized HTTP/network error and keep the prototype architecture unchanged.
