@@ -19,6 +19,10 @@ pub fn parse(uri: &str) -> Result<crate::model::ProxyConfig> {
         "insecure",
         "obfs",
         "obfs-password",
+        "auth",
+        "protocol",
+        "upmbps",
+        "downmbps",
     ];
     Ok(finish(
         Protocol::Hysteria2,
@@ -29,7 +33,8 @@ pub fn parse(uri: &str) -> Result<crate::model::ProxyConfig> {
         None,
         url.password()
             .map(decode_component)
-            .or_else(|| (!url.username().is_empty()).then(|| decode_component(url.username()))),
+            .or_else(|| (!url.username().is_empty()).then(|| decode_component(url.username())))
+            .or_else(|| first_query(&query, "auth").map(|value| decode_component(&value))),
         security_from_query(&query, Security::Tls),
         Transport::Quic,
         first_query(&query, "sni"),

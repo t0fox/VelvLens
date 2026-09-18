@@ -28,6 +28,7 @@ fn parses_all_required_schemes_without_crashing_on_extra_parameters() {
         "trojan://synthetic-password@example.net:443?security=tls",
         "ss://method:password@example.org:443",
         "hysteria2://synthetic-password@hy.example:443?sni=hy.example",
+        "hysteria://hy.example:443?auth=synthetic-password&sni=hy.example",
         "tuic://12345678-1234-1234-1234-123456789abc:synthetic-password@tuic.example:443",
     ];
     for uri in fixtures {
@@ -35,6 +36,17 @@ fn parses_all_required_schemes_without_crashing_on_extra_parameters() {
         assert_ne!(config.protocol, Protocol::Unknown);
         assert!(!config.host.is_empty());
     }
+    let legacy_hysteria = parse_uri(
+        "hysteria://hy.example:443?auth=synthetic-password&sni=hy.example",
+        None,
+        0,
+    )
+    .unwrap();
+    assert_eq!(legacy_hysteria.protocol, Protocol::Hysteria2);
+    assert_eq!(
+        legacy_hysteria.password.as_deref(),
+        Some("synthetic-password")
+    );
 }
 
 #[test]

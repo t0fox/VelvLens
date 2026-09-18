@@ -41,12 +41,13 @@ pub fn has_proxy_uri(text: &str) -> bool {
             "vmess://",
             "trojan://",
             "ss://",
+            "hysteria://",
             "hysteria2://",
             "hy2://",
             "tuic://",
         ]
         .iter()
-        .any(|scheme| line.starts_with(scheme))
+        .any(|scheme| line.to_ascii_lowercase().starts_with(scheme))
     })
 }
 

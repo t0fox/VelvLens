@@ -57,15 +57,17 @@ pub fn decode_candidates(input: &str) -> Vec<DecodedCandidate> {
 
 fn is_useful_decoded(text: &str) -> bool {
     let trimmed = text.trim();
-    trimmed.contains("vless://")
-        || trimmed.contains("vmess://")
-        || trimmed.contains("trojan://")
-        || trimmed.contains("ss://")
-        || trimmed.contains("hysteria2://")
-        || trimmed.contains("hy2://")
-        || trimmed.contains("tuic://")
-        || trimmed.contains("http://")
-        || trimmed.contains("https://")
+    let lower = trimmed.to_ascii_lowercase();
+    lower.contains("vless://")
+        || lower.contains("vmess://")
+        || lower.contains("trojan://")
+        || lower.contains("ss://")
+        || lower.contains("hysteria://")
+        || lower.contains("hysteria2://")
+        || lower.contains("hy2://")
+        || lower.contains("tuic://")
+        || lower.contains("http://")
+        || lower.contains("https://")
         || trimmed.starts_with('{')
         || trimmed.starts_with('[')
         || trimmed.starts_with('<')

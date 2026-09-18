@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use eframe::egui;
 
 use crate::{model::Protocol, resolver::AnalysisReport};
@@ -9,6 +11,7 @@ pub struct MainViewResult {
     pub cancel: bool,
     pub selected: Option<usize>,
     pub copy_all: bool,
+    pub copy_selected: bool,
     pub open_settings: bool,
 }
 
@@ -19,7 +22,8 @@ pub fn show(
     history: &[String],
     report: Option<&AnalysisReport>,
     selected: &mut Option<usize>,
-    filter: &mut Option<Protocol>,
+    protocol_filters: &mut HashSet<Protocol>,
+    selected_configs: &mut HashSet<usize>,
     search: &mut String,
     running: bool,
     status: &str,
@@ -31,6 +35,7 @@ pub fn show(
         cancel: false,
         selected: *selected,
         copy_all: false,
+        copy_selected: false,
         open_settings: false,
     };
 
@@ -146,6 +151,14 @@ pub fn show(
                         theme::SURFACE_RAISED,
                         theme::MUTED,
                     );
+                    if !selected_configs.is_empty() {
+                        theme::badge(
+                            ui,
+                            &format!("{} selected", selected_configs.len()),
+                            egui::Color32::from_rgba_unmultiplied(124, 58, 237, 36),
+                            theme::ACCENT_HOVER,
+                        );
+                    }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let copy = ui.add_sized(
                             [88.0, 30.0],
@@ -158,47 +171,100 @@ pub fn show(
                     });
                 });
                 ui.add_space(10.0);
+                ui.label(
+                    egui::RichText::new("PROTOCOL CATEGORIES")
+                        .size(10.0)
+                        .strong()
+                        .color(theme::MUTED),
+                );
+                ui.add_space(4.0);
                 ui.horizontal_wrapped(|ui| {
-                    filter_button(ui, "All", report.configs.len(), filter, None);
+                    filter_button(ui, "All", report.configs.len(), protocol_filters, None);
                     for protocol in Protocol::ALL {
                         let count = report
                             .configs
                             .iter()
                             .filter(|config| config.protocol == protocol)
                             .count();
-                        filter_button(ui, protocol.as_str(), count, filter, Some(protocol));
+                        filter_button(
+                            ui,
+                            protocol.as_str(),
+                            count,
+                            protocol_filters,
+                            Some(protocol),
+                        );
                     }
                 });
                 ui.add_space(8.0);
                 let search_width = ui.available_width();
                 ui.add_sized(
                     [search_width, 32.0],
-                    egui::TextEdit::singleline(search).hint_text("Search host or name…"),
+                    egui::TextEdit::singleline(search)
+                        .hint_text("Search name/host or exclude -LTE…"),
                 );
-                ui.add_space(10.0);
+                let search_query = search.to_ascii_lowercase();
+                let visible_indices = report
+                    .configs
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, config)| is_visible(config, protocol_filters, &search_query))
+                    .map(|(index, _)| index)
+                    .collect::<Vec<_>>();
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .add_sized(
+                            [112.0, 28.0],
+                            egui::Button::new("Select visible").fill(theme::SURFACE_RAISED),
+                        )
+                        .clicked()
+                    {
+                        selected_configs.extend(visible_indices.iter().copied());
+                    }
+                    if ui
+                        .add_sized(
+                            [88.0, 28.0],
+                            egui::Button::new("Clear selection").fill(theme::SURFACE_RAISED),
+                        )
+                        .clicked()
+                    {
+                        selected_configs.clear();
+                    }
+                    let selected_count = selected_configs.len();
+                    let copy_selected = ui.add_enabled(
+                        selected_count > 0,
+                        egui::Button::new(format!("Copy selected ({selected_count})")).fill(
+                            if selected_count > 0 {
+                                theme::ACCENT
+                            } else {
+                                theme::SURFACE_RAISED
+                            },
+                        ),
+                    );
+                    if copy_selected.clicked() {
+                        result.copy_selected = true;
+                    }
+                });
+                ui.add_space(8.0);
                 egui::ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        for (index, config) in report.configs.iter().enumerate() {
-                            if filter
-                                .as_ref()
-                                .is_some_and(|active| *active != config.protocol)
-                            {
-                                continue;
+                        for index in visible_indices.iter().copied() {
+                            let config = &report.configs[index];
+                            let response = config_card::show(
+                                ui,
+                                config,
+                                *selected == Some(index),
+                                selected_configs.contains(&index),
+                            );
+                            if response.selection_toggled {
+                                if selected_configs.contains(&index) {
+                                    selected_configs.remove(&index);
+                                } else {
+                                    selected_configs.insert(index);
+                                }
                             }
-                            if !search.is_empty()
-                                && !format!(
-                                    "{} {}",
-                                    config.name.as_deref().unwrap_or_default(),
-                                    config.host
-                                )
-                                .to_ascii_lowercase()
-                                .contains(&search.to_ascii_lowercase())
-                            {
-                                continue;
-                            }
-                            let response = config_card::show(ui, config, *selected == Some(index));
-                            if response.clicked() {
+                            if response.clicked {
                                 *selected = Some(index);
                                 result.selected = Some(index);
                             }
@@ -281,10 +347,11 @@ fn filter_button(
     ui: &mut egui::Ui,
     label: &str,
     count: usize,
-    filter: &mut Option<Protocol>,
+    protocol_filters: &mut HashSet<Protocol>,
     value: Option<Protocol>,
 ) {
-    let active = *filter == value;
+    let active = value.is_none() && protocol_filters.is_empty()
+        || value.is_some_and(|protocol| protocol_filters.contains(&protocol));
     let fill = if active {
         theme::ACCENT
     } else {
@@ -307,8 +374,40 @@ fn filter_button(
         .fill(fill),
     );
     if response.clicked() {
-        *filter = value;
+        if let Some(protocol) = value {
+            if !protocol_filters.insert(protocol) {
+                protocol_filters.remove(&protocol);
+            }
+        } else {
+            protocol_filters.clear();
+        }
     }
+}
+
+fn is_visible(
+    config: &crate::model::ProxyConfig,
+    protocol_filters: &HashSet<Protocol>,
+    search_query: &str,
+) -> bool {
+    if !protocol_filters.is_empty() && !protocol_filters.contains(&config.protocol) {
+        return false;
+    }
+    if search_query.is_empty() {
+        return true;
+    }
+    let haystack = format!(
+        "{} {}",
+        config.name.as_deref().unwrap_or_default(),
+        config.host
+    )
+    .to_ascii_lowercase();
+    search_query.split_whitespace().all(|term| {
+        if let Some(excluded) = term.strip_prefix('-') {
+            !excluded.is_empty() && !haystack.contains(excluded)
+        } else {
+            haystack.contains(term)
+        }
+    })
 }
 
 fn empty_state(ui: &mut egui::Ui, status: &str, running: bool) {

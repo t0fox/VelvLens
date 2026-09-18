@@ -4,7 +4,18 @@ use crate::model::{Protocol, ProxyConfig};
 
 use super::theme;
 
-pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Response {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CardResponse {
+    pub clicked: bool,
+    pub selection_toggled: bool,
+}
+
+pub fn show(
+    ui: &mut egui::Ui,
+    config: &ProxyConfig,
+    selected: bool,
+    selected_for_export: bool,
+) -> CardResponse {
     let cursor = ui.cursor().min;
     let card_rect = egui::Rect::from_min_size(cursor, egui::vec2(ui.available_width(), 80.0));
     let hovered = ui
@@ -24,6 +35,7 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
     } else {
         egui::Stroke::new(1.0_f32, theme::BORDER)
     };
+    let mut selection_toggled = false;
     let frame_response = egui::Frame::none()
         .fill(fill)
         .stroke(stroke)
@@ -47,16 +59,20 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
                             .color(theme::MUTED),
                     );
                 });
-                if config.metadata.exact_duplicate_count > 1 {
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                    let mut checked = selected_for_export;
+                    if ui.checkbox(&mut checked, "Select").clicked() {
+                        selection_toggled = true;
+                    }
+                    if config.metadata.exact_duplicate_count > 1 {
                         theme::badge(
                             ui,
                             &format!("×{}", config.metadata.exact_duplicate_count),
                             egui::Color32::from_rgba_unmultiplied(231, 173, 60, 34),
                             theme::WARNING,
                         );
-                    });
-                }
+                    }
+                });
             });
             ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
@@ -81,11 +97,15 @@ pub fn show(ui: &mut egui::Ui, config: &ProxyConfig, selected: bool) -> egui::Re
             });
         })
         .response;
-    ui.interact(
+    let response = ui.interact(
         frame_response.rect,
         ui.id().with(("config-card", config.id.as_str())),
         egui::Sense::click(),
-    )
+    );
+    CardResponse {
+        clicked: response.clicked(),
+        selection_toggled,
+    }
 }
 
 fn protocol_mark(ui: &mut egui::Ui, protocol: Protocol) {

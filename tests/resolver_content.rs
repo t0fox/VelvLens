@@ -88,6 +88,16 @@ fn walks_nested_json_and_html_for_proxy_and_subscription_urls() {
 }
 
 #[test]
+fn extracts_legacy_hysteria_alias_and_case_insensitive_schemes() {
+    let result = extract_items(
+        "HYSTERIA://hy.example:443?auth=synthetic-password\n",
+        ContentKind::ProxyList,
+    );
+    assert_eq!(result.proxy_uris.len(), 1);
+    assert!(result.proxy_uris[0].starts_with("HYSTERIA://"));
+}
+
+#[test]
 fn failed_stage_redacts_uri_credentials() {
     let stage = sublens::resolver::stage::PipelineStage::failure(
         sublens::resolver::stage::StageKind::Parse,

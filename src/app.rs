@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use crate::{
     history::HistoryStore,
@@ -19,7 +19,8 @@ pub struct SubLensApp {
     job: Option<JobHandle>,
     report: Option<AnalysisReport>,
     selected: Option<usize>,
-    filter: Option<Protocol>,
+    protocol_filters: HashSet<Protocol>,
+    selected_configs: HashSet<usize>,
     search: String,
     settings: AppSettings,
     history: HistoryStore,
@@ -37,7 +38,8 @@ impl SubLensApp {
             job: None,
             report: None,
             selected: None,
-            filter: None,
+            protocol_filters: HashSet::new(),
+            selected_configs: HashSet::new(),
             search: String::new(),
             settings: AppSettings::default(),
             history: HistoryStore::load(false),
@@ -54,6 +56,8 @@ impl SubLensApp {
         }
         self.report = None;
         self.selected = None;
+        self.protocol_filters.clear();
+        self.selected_configs.clear();
         if self.settings.history_enabled {
             self.history = HistoryStore::load(true);
             self.history.append(&url);
@@ -116,7 +120,8 @@ impl eframe::App for SubLensApp {
             self.history.urls(),
             self.report.as_ref(),
             &mut self.selected,
-            &mut self.filter,
+            &mut self.protocol_filters,
+            &mut self.selected_configs,
             &mut self.search,
             running,
             &self.status,
@@ -137,6 +142,18 @@ impl eframe::App for SubLensApp {
         if result.copy_all {
             if let Some(report) = &self.report {
                 ui::details::copy_to_clipboard(&crate::export::v2rayn_bulk(&report.configs));
+            }
+        }
+        if result.copy_selected {
+            if let Some(report) = &self.report {
+                let configs = report
+                    .configs
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| self.selected_configs.contains(index))
+                    .map(|(_, config)| config.clone())
+                    .collect::<Vec<_>>();
+                ui::details::copy_to_clipboard(&crate::export::v2rayn_bulk(&configs));
             }
         }
     }

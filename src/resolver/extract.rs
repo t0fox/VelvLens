@@ -64,8 +64,10 @@ fn collect_json_strings(value: &Value, sources: &mut Vec<String>) {
 fn extract_regex_matches(source: &str, result: &mut ExtractionResult) {
     static CANDIDATE_RE: OnceLock<Regex> = OnceLock::new();
     let regex = CANDIDATE_RE.get_or_init(|| {
-        Regex::new(r#"(?i)(?:vless|vmess|trojan|ss|hysteria2|hy2|tuic|https?)://[^\s<>'\"`]+"#)
-            .expect("candidate regex is valid")
+        Regex::new(
+            r#"(?i)(?:vless|vmess|trojan|ss|hysteria|hysteria2|hy2|tuic|https?)://[^\s<>'\"`]+"#,
+        )
+        .expect("candidate regex is valid")
     });
 
     for matched in regex.find_iter(source) {
@@ -73,7 +75,10 @@ fn extract_regex_matches(source: &str, result: &mut ExtractionResult) {
             .as_str()
             .trim_end_matches([',', '.', ';', ')', ']', '}'])
             .to_owned();
-        if candidate.starts_with("http://") || candidate.starts_with("https://") {
+        let scheme = candidate
+            .split_once("://")
+            .map(|(scheme, _)| scheme.to_ascii_lowercase());
+        if matches!(scheme.as_deref(), Some("http" | "https")) {
             push_unique(&mut result.nested_urls, candidate);
         } else {
             push_unique(&mut result.proxy_uris, candidate);

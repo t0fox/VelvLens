@@ -8,8 +8,9 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 2. Paste a subscription or share URL.
 3. Select **Analyze**.
 4. Review the HTTP → Decode → Extract → Parse stages.
-5. Select a card to open the Inspector, copy a URI, or generate a local QR code.
-6. Use **Copy all for v2rayN** and paste it into v2rayN's **Import bulk URL from clipboard** action.
+5. Select a card to open the Inspector; use the visible **Copy URI**, **Copy safe**, or **QR** actions.
+6. Select protocol categories, use **Select visible**, or check individual cards.
+7. Use **Copy selected** or **Copy all** and paste the result into v2rayN's **Import bulk URL from clipboard** action.
 
 ## Supported content
 
@@ -20,7 +21,9 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 - HTML DOM text, links, attributes, scripts, and embedded JSON.
 - Nested subscription URLs with loop/depth/byte/count limits.
 
-Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Hysteria2/Hy2, and TUIC. Unknown content is reported in the pipeline and does not crash the application.
+Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Hysteria/Hysteria2/Hy2, and TUIC. Unknown content is reported in the pipeline and does not crash the application.
+
+The catalog supports multiple protocol filters at once. The name/host search accepts exclusion terms such as `-LTE` or `-Torrent`, so unwanted categories can be left out before using **Select visible**.
 
 ## Privacy and safety
 
