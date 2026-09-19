@@ -19,20 +19,23 @@ use sublens::{
         stage::{PipelineStage, StageKind},
         AnalysisReport, ContentKind,
     },
-    ui::main_view::{self, ConnectivityFilter, DuplicateFilter},
+    ui::main_view::{self, CompactPage, ConnectivityFilter, DuplicateFilter, LteFilter},
 };
 
 struct FixtureApp {
     input: String,
     report: AnalysisReport,
-    selected: Option<usize>,
+    selected: Option<String>,
     protocol_filters: HashSet<Protocol>,
-    selected_configs: HashSet<usize>,
+    selected_configs: HashSet<String>,
     search: String,
     security_filter: Option<Security>,
     transport_filter: Option<Transport>,
     connectivity_filter: ConnectivityFilter,
     duplicate_filter: DuplicateFilter,
+    lte_filter: LteFilter,
+    selection_mode: bool,
+    compact_page: CompactPage,
     qr: Option<sublens::qr::QrMatrix>,
     diagnostics: HashMap<usize, sublens::diagnostics::DiagnosticResult>,
     copied_until: Option<std::time::Instant>,
@@ -45,12 +48,19 @@ impl FixtureApp {
 
     fn with_context(ctx: &egui::Context) -> Self {
         configure_style(ctx);
+        let report = fixture_report();
+        let selected = configs_first_id(&report);
+        let compact_page = if env::var("SUBLENS_FIXTURE_PAGE").as_deref() == Ok("details") {
+            CompactPage::ConfigDetails
+        } else {
+            CompactPage::ConfigList
+        };
         Self {
             input: "https://fixture.local/subscription.txt".to_owned(),
-            report: fixture_report(),
+            report,
             // Keep the visual fixture focused on the protocol that previously
             // regressed in the real subscription response.
-            selected: Some(0),
+            selected,
             protocol_filters: HashSet::new(),
             selected_configs: HashSet::new(),
             search: String::new(),
@@ -58,6 +68,9 @@ impl FixtureApp {
             transport_filter: None,
             connectivity_filter: ConnectivityFilter::All,
             duplicate_filter: DuplicateFilter::All,
+            lte_filter: LteFilter::All,
+            selection_mode: env::var("SUBLENS_FIXTURE_SELECTION").as_deref() == Ok("1"),
+            compact_page,
             qr: None,
             diagnostics: HashMap::new(),
             copied_until: None,
@@ -78,16 +91,23 @@ impl FixtureApp {
             &mut self.transport_filter,
             &mut self.connectivity_filter,
             &mut self.duplicate_filter,
+            &mut self.lte_filter,
+            &mut self.selection_mode,
+            &mut self.compact_page,
             false,
             "Fixture loaded",
             &mut self.qr,
             &self.diagnostics,
             &mut self.copied_until,
         );
-        if let Some(index) = result.selected {
-            self.selected = Some(index);
+        if let Some(id) = result.selected {
+            self.selected = Some(id);
         }
     }
+}
+
+fn configs_first_id(report: &AnalysisReport) -> Option<String> {
+    report.configs.first().map(|config| config.id.clone())
 }
 
 impl eframe::App for FixtureApp {

@@ -14,7 +14,7 @@ use crate::{
 };
 use eframe::egui;
 
-use crate::ui::main_view::{ConnectivityFilter, DuplicateFilter};
+use crate::ui::main_view::{CompactPage, ConnectivityFilter, DuplicateFilter, LteFilter};
 use crate::ui::theme;
 
 pub struct SubLensApp {
@@ -25,14 +25,17 @@ pub struct SubLensApp {
     diagnostic_job: Option<JobHandle>,
     diagnostic_target: Option<usize>,
     report: Option<AnalysisReport>,
-    selected: Option<usize>,
+    selected_config: Option<String>,
     protocol_filters: HashSet<Protocol>,
-    selected_configs: HashSet<usize>,
+    selected_configs: HashSet<String>,
     search: String,
     security_filter: Option<crate::model::Security>,
     transport_filter: Option<crate::model::Transport>,
     connectivity_filter: ConnectivityFilter,
     duplicate_filter: DuplicateFilter,
+    lte_filter: LteFilter,
+    selection_mode: bool,
+    compact_page: CompactPage,
     settings: AppSettings,
     history: HistoryStore,
     show_settings: bool,
@@ -55,7 +58,7 @@ impl SubLensApp {
             diagnostic_job: None,
             diagnostic_target: None,
             report: None,
-            selected: None,
+            selected_config: None,
             protocol_filters: HashSet::new(),
             selected_configs: HashSet::new(),
             search: String::new(),
@@ -63,6 +66,9 @@ impl SubLensApp {
             transport_filter: None,
             connectivity_filter: ConnectivityFilter::All,
             duplicate_filter: DuplicateFilter::All,
+            lte_filter: LteFilter::All,
+            selection_mode: false,
+            compact_page: CompactPage::ConfigList,
             settings,
             history,
             show_settings: false,
@@ -81,13 +87,16 @@ impl SubLensApp {
         }
         self.report = None;
         self.show_export = false;
-        self.selected = None;
+        self.selected_config = None;
         self.protocol_filters.clear();
         self.selected_configs.clear();
         self.security_filter = None;
         self.transport_filter = None;
         self.connectivity_filter = ConnectivityFilter::All;
         self.duplicate_filter = DuplicateFilter::All;
+        self.lte_filter = LteFilter::All;
+        self.selection_mode = false;
+        self.compact_page = CompactPage::ConfigList;
         self.diagnostics.clear();
         if let Some(job) = &self.diagnostic_job {
             job.cancel.cancel();
@@ -120,7 +129,8 @@ impl SubLensApp {
                         "HTTP complete · Decode complete · {} configurations found",
                         report.configs.len()
                     );
-                    self.selected = report.configs.first().map(|_| 0);
+                    self.selected_config = report.configs.first().map(|config| config.id.clone());
+                    self.compact_page = CompactPage::ConfigList;
                     self.report = Some(*report);
                     finished = true;
                 }
@@ -321,7 +331,7 @@ impl eframe::App for SubLensApp {
             &mut self.input,
             self.history.urls(),
             self.report.as_ref(),
-            &mut self.selected,
+            &mut self.selected_config,
             &mut self.protocol_filters,
             &mut self.selected_configs,
             &mut self.search,
@@ -329,6 +339,9 @@ impl eframe::App for SubLensApp {
             &mut self.transport_filter,
             &mut self.connectivity_filter,
             &mut self.duplicate_filter,
+            &mut self.lte_filter,
+            &mut self.selection_mode,
+            &mut self.compact_page,
             running,
             &self.status,
             &mut self.qr,
@@ -349,8 +362,14 @@ impl eframe::App for SubLensApp {
                 job.cancel.cancel();
             }
         }
-        if let Some(index) = result.test {
-            self.start_diagnostic(index);
+        if let Some(id) = result.test {
+            if let Some(index) = self
+                .report
+                .as_ref()
+                .and_then(|report| report.configs.iter().position(|config| config.id == id))
+            {
+                self.start_diagnostic(index);
+            }
         }
         if result.copy_all {
             if let Some(report) = &self.report {
@@ -359,12 +378,13 @@ impl eframe::App for SubLensApp {
         }
         if result.copy_selected {
             if let Some(report) = &self.report {
+                let mut seen = HashSet::new();
                 let configs = report
                     .configs
                     .iter()
-                    .enumerate()
-                    .filter(|(index, _)| self.selected_configs.contains(index))
-                    .map(|(_, config)| config.clone())
+                    .filter(|config| self.selected_configs.contains(&config.id))
+                    .filter(|config| seen.insert(config.raw_uri.clone()))
+                    .cloned()
                     .collect::<Vec<_>>();
                 ui::details::copy_to_clipboard(&crate::export::raw_lines(&configs));
             }

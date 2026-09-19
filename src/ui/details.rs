@@ -15,6 +15,7 @@ pub fn show(
     qr: &mut Option<QrMatrix>,
     diagnostic: Option<&crate::diagnostics::DiagnosticResult>,
     copied_until: &mut Option<Instant>,
+    compact: bool,
 ) -> bool {
     let json_payload = is_json_payload(config);
     if copied_until.is_some_and(|until| until <= Instant::now()) {
@@ -66,51 +67,57 @@ pub fn show(
             if let Some(flow) = &config.flow {
                 theme::badge(ui, flow, theme::SURFACE_RAISED, theme::MUTED);
             }
-        });
-        ui.add_space(12.0);
-        ui.horizontal_wrapped(|ui| {
-            let copied = copied_until.is_some();
-            if ui
-                .add_sized(
-                    [190.0, 36.0],
-                    egui::Button::new(if copied {
-                        egui::RichText::new("✓ Copied").strong()
-                    } else if json_payload {
-                        egui::RichText::new("Copy JSON config").strong()
-                    } else {
-                        egui::RichText::new("Copy configuration").strong()
-                    })
-                    .fill(theme::ACCENT),
-                )
-                .clicked()
-            {
-                copy_config(config, copied_until);
-            }
-            if ui
-                .add_sized(
-                    [68.0, 36.0],
-                    egui::Button::new("Copy").fill(theme::SURFACE_RAISED),
-                )
-                .clicked()
-            {
-                copy_config(config, copied_until);
-            }
-            let qr_response = ui.add_enabled(
-                !json_payload,
-                egui::Button::new(if json_payload { "QR unavailable" } else { "QR" })
-                    .fill(theme::SURFACE_RAISED),
-            );
-            if qr_response.clicked() {
-                *qr = Some(crate::qr::encode(&config.raw_uri));
-            }
-            if ui
-                .add_sized(
-                    [88.0, 36.0],
-                    egui::Button::new("Test").fill(theme::SURFACE_RAISED),
-                )
-                .clicked()
-            {
-                test = true;
+            if !compact {
+                let copied = copied_until.is_some();
+                if ui
+                    .add_sized(
+                        [178.0, 34.0],
+                        egui::Button::new(if copied {
+                            "✓ Copied"
+                        } else {
+                            "Copy configuration"
+                        })
+                        .fill(theme::ACCENT),
+                    )
+                    .clicked()
+                {
+                    copy_config(config, copied_until);
+                }
+                let qr_response = ui.add_enabled(
+                    !json_payload,
+                    egui::Button::new(if json_payload { "QR unavailable" } else { "QR" })
+                        .fill(theme::SURFACE_RAISED),
+                );
+                if qr_response.clicked() {
+                    *qr = Some(crate::qr::encode(&config.raw_uri));
+                }
+                ui.menu_button("More", |ui| {
+                    if ui.button("Test connectivity").clicked() {
+                        test = true;
+                        ui.close_menu();
+                    }
+                });
+            } else {
+                ui.menu_button("Actions", |ui| {
+                    if ui
+                        .add_enabled(
+                            !json_payload,
+                            egui::Button::new(if json_payload {
+                                "QR unavailable"
+                            } else {
+                                "QR code"
+                            }),
+                        )
+                        .clicked()
+                    {
+                        *qr = Some(crate::qr::encode(&config.raw_uri));
+                        ui.close_menu();
+                    }
+                    if ui.button("Test connectivity").clicked() {
+                        test = true;
+                        ui.close_menu();
+                    }
+                });
             }
         });
         ui.add_space(12.0);
@@ -123,7 +130,7 @@ pub fn show(
                 .color(theme::MUTED),
         );
         ui.add_space(8.0);
-        show_fields(ui, config);
+        show_fields(ui, config, compact);
         ui.add_space(12.0);
         egui::Frame::none()
             .fill(theme::CANVAS)
@@ -131,35 +138,23 @@ pub fn show(
             .rounding(egui::Rounding::same(8.0))
             .inner_margin(egui::Margin::symmetric(10.0, 8.0))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new(if json_payload {
-                            "Configuration JSON"
-                        } else {
-                            "Configuration URI"
-                        })
-                        .size(11.0)
-                        .strong()
-                        .color(theme::MUTED),
-                    );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .add_sized(
-                                [58.0, 24.0],
-                                egui::Button::new("Copy").fill(theme::SURFACE_RAISED),
-                            )
-                            .clicked()
-                        {
-                            copy_config(config, copied_until);
-                        }
-                    });
-                });
+                ui.label(
+                    egui::RichText::new(if json_payload {
+                        "Configuration JSON"
+                    } else {
+                        "Configuration URI"
+                    })
+                    .size(11.0)
+                    .strong()
+                    .color(theme::MUTED),
+                );
                 let mut raw_uri = config.raw_uri.clone();
                 ui.add(
                     egui::TextEdit::singleline(&mut raw_uri)
                         .desired_width(f32::INFINITY)
                         .interactive(false),
-                );
+                )
+                .on_hover_text(&config.raw_uri);
             });
         if let Some(result) = diagnostic {
             ui.add_space(12.0);
@@ -195,7 +190,7 @@ pub fn show(
     test
 }
 
-fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig) {
+fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig, compact: bool) {
     let mut fields = vec![
         ("Protocol", config.protocol.as_str().to_owned()),
         ("Address", config.host.clone()),
@@ -235,10 +230,10 @@ fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig) {
     }
 
     egui::Grid::new(ui.id().with("configuration-fields"))
-        .num_columns(4)
+        .num_columns(if compact { 2 } else { 4 })
         .spacing(egui::vec2(18.0, 10.0))
         .show(ui, |ui| {
-            for pair in fields.chunks(2) {
+            for pair in fields.chunks(if compact { 1 } else { 2 }) {
                 for (label, value) in pair {
                     ui.label(egui::RichText::new(*label).size(11.0).color(theme::MUTED));
                     ui.label(
@@ -273,7 +268,7 @@ fn display_port(config: &ProxyConfig) -> String {
         .unwrap_or_else(|| config.port.to_string())
 }
 
-fn copy_config(config: &ProxyConfig, copied_until: &mut Option<Instant>) {
+pub fn copy_config(config: &ProxyConfig, copied_until: &mut Option<Instant>) {
     copy_to_clipboard(&config.raw_uri);
     *copied_until = Some(Instant::now() + Duration::from_secs(2));
 }

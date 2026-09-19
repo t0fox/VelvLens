@@ -94,6 +94,74 @@ pub fn pipeline_strip(
     }
 }
 
+pub fn compact_pipeline(
+    ui: &mut egui::Ui,
+    report: Option<&AnalysisReport>,
+    running: bool,
+    status: &str,
+) {
+    theme::control_frame(theme::SURFACE).show(ui, |ui| {
+        ui.horizontal(|ui| {
+            if let Some(report) = report {
+                let failed = report
+                    .stages
+                    .iter()
+                    .any(|stage| matches!(stage.status, StageStatus::Failed));
+                status_mark(
+                    ui,
+                    if failed { theme::ERROR } else { theme::SUCCESS },
+                    if failed {
+                        StatusMark::Failure
+                    } else {
+                        StatusMark::Success
+                    },
+                );
+                ui.label(
+                    egui::RichText::new(if failed {
+                        "Analysis failed"
+                    } else {
+                        "Analysis complete"
+                    })
+                    .size(11.0)
+                    .color(if failed { theme::ERROR } else { theme::TEXT }),
+                );
+                ui.label(
+                    egui::RichText::new(format!("· {} configurations", report.configs.len()))
+                        .size(11.0)
+                        .color(theme::MUTED),
+                );
+            } else {
+                status_mark(
+                    ui,
+                    if running {
+                        theme::WARNING
+                    } else {
+                        theme::SUCCESS
+                    },
+                    if running {
+                        StatusMark::Pending
+                    } else {
+                        StatusMark::Success
+                    },
+                );
+                ui.label(
+                    egui::RichText::new(if running {
+                        if status.is_empty() {
+                            "Analyzing…"
+                        } else {
+                            status
+                        }
+                    } else {
+                        "Ready"
+                    })
+                    .size(11.0)
+                    .color(theme::MUTED),
+                );
+            }
+        });
+    });
+}
+
 pub fn show(ui: &mut egui::Ui, report: &AnalysisReport) {
     egui::CollapsingHeader::new("Processing inspector")
         .default_open(false)

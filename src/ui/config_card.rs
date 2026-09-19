@@ -10,18 +10,34 @@ pub struct CardResponse {
     pub selection_toggled: bool,
 }
 
+/// Backwards-compatible normal card entry point used by the UI smoke test.
 pub fn show(
     ui: &mut egui::Ui,
     config: &ProxyConfig,
     selected: bool,
     selected_for_export: bool,
 ) -> CardResponse {
+    show_with_mode(ui, config, selected, selected_for_export, false)
+}
+
+pub fn show_with_mode(
+    ui: &mut egui::Ui,
+    config: &ProxyConfig,
+    selected: bool,
+    selected_for_export: bool,
+    selection_mode: bool,
+) -> CardResponse {
     let port = config
         .port_range
         .clone()
         .unwrap_or_else(|| config.port.to_string());
-    let cursor = ui.cursor().min;
-    let card_rect = egui::Rect::from_min_size(cursor, egui::vec2(ui.available_width(), 68.0));
+    let card_rect = egui::Rect::from_min_size(
+        ui.cursor().min,
+        egui::vec2(
+            ui.available_width(),
+            if selection_mode { 72.0 } else { 68.0 },
+        ),
+    );
     let hovered = ui
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|position| card_rect.contains(position));
@@ -40,58 +56,34 @@ pub fn show(
         egui::Stroke::new(1.0_f32, theme::BORDER)
     };
     let mut selection_toggled = false;
-    let mut details_clicked = false;
-    let frame_response = egui::Frame::none()
+    egui::Frame::none()
         .fill(fill)
         .stroke(stroke)
-        .rounding(egui::Rounding::same(10.0))
-        .inner_margin(egui::Margin::symmetric(10.0, 5.0))
+        .rounding(egui::Rounding::same(9.0))
+        .inner_margin(egui::Margin::symmetric(10.0, 6.0))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 protocol_mark(ui, config.protocol);
-                ui.add_space(6.0);
+                ui.add_space(7.0);
                 ui.vertical(|ui| {
+                    let name = config.name.as_deref().unwrap_or("Unnamed configuration");
                     ui.add(
-                        egui::Label::new(
-                            egui::RichText::new(
-                                config.name.as_deref().unwrap_or("Unnamed configuration"),
-                            )
-                            .size(13.0)
-                            .strong(),
-                        )
-                        .truncate(),
-                    );
+                        egui::Label::new(egui::RichText::new(name).size(13.0).strong()).truncate(),
+                    )
+                    .on_hover_text(name);
+                    let host = format!("{}:{port}", config.host);
                     ui.add(
-                        egui::Label::new(
-                            egui::RichText::new(format!("{}:{port}", config.host))
-                                .size(10.0)
-                                .color(theme::MUTED),
-                        )
-                        .truncate(),
-                    );
+                        egui::Label::new(egui::RichText::new(&host).size(10.0).color(theme::MUTED))
+                            .truncate(),
+                    )
+                    .on_hover_text(host);
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                    if ui
-                        .add_sized(
-                            [58.0, 22.0],
-                            egui::Button::new(egui::RichText::new("Details").size(9.5))
-                                .fill(theme::SURFACE_RAISED),
-                        )
-                        .clicked()
-                    {
-                        details_clicked = true;
-                    }
-                    let mut checked = selected_for_export;
-                    if ui.checkbox(&mut checked, "Select").clicked() {
-                        selection_toggled = true;
-                    }
-                    if config.metadata.exact_duplicate_count > 1 {
-                        theme::badge(
-                            ui,
-                            &format!("×{}", config.metadata.exact_duplicate_count),
-                            egui::Color32::from_rgba_unmultiplied(231, 173, 60, 34),
-                            theme::WARNING,
-                        );
+                    if selection_mode {
+                        let mut checked = selected_for_export;
+                        if ui.checkbox(&mut checked, "Select").clicked() {
+                            selection_toggled = true;
+                        }
                     }
                 });
             });
@@ -103,36 +95,47 @@ pub fn show(
                     protocol_fill(config.protocol),
                     egui::Color32::WHITE,
                 );
-                theme::badge(
-                    ui,
-                    config.security.as_str(),
-                    theme::SURFACE_RAISED,
-                    theme::MUTED,
-                );
-                theme::badge(
-                    ui,
-                    config.transport.as_str(),
-                    theme::SURFACE_RAISED,
-                    theme::MUTED,
-                );
+                if config.security != crate::model::Security::Unknown {
+                    theme::badge(
+                        ui,
+                        config.security.as_str(),
+                        theme::SURFACE_RAISED,
+                        theme::MUTED,
+                    );
+                }
+                if config.transport != crate::model::Transport::Unknown {
+                    theme::badge(
+                        ui,
+                        config.transport.as_str(),
+                        theme::SURFACE_RAISED,
+                        theme::MUTED,
+                    );
+                }
+                if config.metadata.exact_duplicate_count > 1 {
+                    theme::badge(
+                        ui,
+                        &format!("×{}", config.metadata.exact_duplicate_count),
+                        egui::Color32::from_rgba_unmultiplied(231, 173, 60, 34),
+                        theme::WARNING,
+                    );
+                }
             });
-        })
-        .response;
+        });
     let response = ui.interact(
-        frame_response.rect,
+        card_rect,
         ui.id().with(("config-card", config.id.as_str())),
         egui::Sense::click(),
     );
     if response.has_focus() {
         ui.painter().rect_stroke(
-            frame_response.rect.expand(1.0),
-            egui::Rounding::same(10.0),
+            card_rect.expand(1.0),
+            egui::Rounding::same(9.0),
             egui::Stroke::new(2.0_f32, theme::ACCENT_HOVER),
         );
     }
     CardResponse {
-        clicked: response.clicked() || details_clicked,
-        selection_toggled,
+        clicked: !selection_mode && response.clicked(),
+        selection_toggled: selection_toggled || (selection_mode && response.clicked()),
     }
 }
 

@@ -14,6 +14,11 @@ pub const SUCCESS: egui::Color32 = egui::Color32::from_rgb(53, 208, 127);
 pub const WARNING: egui::Color32 = egui::Color32::from_rgb(231, 173, 60);
 pub const ERROR: egui::Color32 = egui::Color32::from_rgb(241, 107, 107);
 
+// Two-column mode needs roughly 300 px for the catalog, 620 px for readable
+// details, and the surrounding gutters. Below this layout budget, the list
+// and inspector become separate pages instead of competing for width.
+pub const WIDE_BREAKPOINT: f32 = 1000.0;
+
 pub fn surface_frame(fill: egui::Color32) -> egui::Frame {
     egui::Frame::none()
         .fill(fill)
