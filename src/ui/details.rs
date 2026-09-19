@@ -29,18 +29,16 @@ pub fn show(
             ui.vertical(|ui| {
                 ui.add(
                     egui::Label::new(
-                        egui::RichText::new(
-                            config.name.as_deref().unwrap_or("Unnamed configuration"),
-                        )
-                        .size(19.0)
-                        .strong(),
+                        egui::RichText::new(config.name.as_deref().unwrap_or("Без названия"))
+                            .size(19.0)
+                            .strong(),
                     )
                     .truncate(),
                 );
                 ui.label(
                     egui::RichText::new(format!("{}:{}", config.host, display_port(config)))
                         .size(12.0)
-                        .color(theme::MUTED),
+                        .color(theme::TEXT_SECONDARY),
                 );
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
@@ -61,11 +59,11 @@ pub fn show(
                     ui,
                     config.transport.as_str(),
                     theme::SURFACE_RAISED,
-                    theme::MUTED,
+                    theme::TEXT_SECONDARY,
                 );
             }
             if let Some(flow) = &config.flow {
-                theme::badge(ui, flow, theme::SURFACE_RAISED, theme::MUTED);
+                theme::badge(ui, flow, theme::SURFACE_RAISED, theme::TEXT_SECONDARY);
             }
             if !compact {
                 let copied = copied_until.is_some();
@@ -73,9 +71,9 @@ pub fn show(
                     .add_sized(
                         [178.0, 34.0],
                         egui::Button::new(if copied {
-                            "✓ Copied"
+                            "Скопировано"
                         } else {
-                            "Copy configuration"
+                            "Скопировать конфигурацию"
                         })
                         .fill(theme::ACCENT),
                     )
@@ -85,27 +83,31 @@ pub fn show(
                 }
                 let qr_response = ui.add_enabled(
                     !json_payload,
-                    egui::Button::new(if json_payload { "QR unavailable" } else { "QR" })
-                        .fill(theme::SURFACE_RAISED),
+                    egui::Button::new(if json_payload {
+                        "QR недоступен"
+                    } else {
+                        "QR"
+                    })
+                    .fill(theme::SURFACE_RAISED),
                 );
                 if qr_response.clicked() {
                     *qr = Some(crate::qr::encode(&config.raw_uri));
                 }
-                ui.menu_button("More", |ui| {
-                    if ui.button("Test connectivity").clicked() {
+                ui.menu_button("Ещё", |ui| {
+                    if ui.button("Проверить соединение").clicked() {
                         test = true;
                         ui.close_menu();
                     }
                 });
             } else {
-                ui.menu_button("Actions", |ui| {
+                ui.menu_button("Действия", |ui| {
                     if ui
                         .add_enabled(
                             !json_payload,
                             egui::Button::new(if json_payload {
-                                "QR unavailable"
+                                "QR недоступен"
                             } else {
-                                "QR code"
+                                "QR-код"
                             }),
                         )
                         .clicked()
@@ -113,7 +115,7 @@ pub fn show(
                         *qr = Some(crate::qr::encode(&config.raw_uri));
                         ui.close_menu();
                     }
-                    if ui.button("Test connectivity").clicked() {
+                    if ui.button("Проверить соединение").clicked() {
                         test = true;
                         ui.close_menu();
                     }
@@ -121,32 +123,28 @@ pub fn show(
             }
         });
         ui.add_space(12.0);
-        ui.separator();
-        ui.add_space(10.0);
+        ui.add_space(4.0);
         ui.label(
-            egui::RichText::new("CONFIGURATION DETAILS")
+            egui::RichText::new("ПАРАМЕТРЫ СОЕДИНЕНИЯ")
                 .size(10.0)
                 .strong()
-                .color(theme::MUTED),
+                .color(theme::TEXT_MUTED),
         );
         ui.add_space(8.0);
         show_fields(ui, config, compact);
         ui.add_space(12.0);
         egui::Frame::none()
-            .fill(theme::CANVAS)
-            .stroke(egui::Stroke::new(1.0_f32, theme::BORDER))
-            .rounding(egui::Rounding::same(8.0))
-            .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+            .inner_margin(egui::Margin::symmetric(0.0, 4.0))
             .show(ui, |ui| {
                 ui.label(
                     egui::RichText::new(if json_payload {
-                        "Configuration JSON"
+                        "Конфигурация JSON"
                     } else {
-                        "Configuration URI"
+                        "URI конфигурации"
                     })
                     .size(11.0)
                     .strong()
-                    .color(theme::MUTED),
+                    .color(theme::TEXT_MUTED),
                 );
                 let mut raw_uri = config.raw_uri.clone();
                 ui.add(
@@ -158,13 +156,12 @@ pub fn show(
             });
         if let Some(result) = diagnostic {
             ui.add_space(12.0);
-            ui.separator();
             ui.add_space(8.0);
             ui.label(
-                egui::RichText::new("CONNECTIVITY CHECK")
+                egui::RichText::new("ПРОВЕРКА СОЕДИНЕНИЯ")
                     .size(10.0)
                     .strong()
-                    .color(theme::MUTED),
+                    .color(theme::TEXT_MUTED),
             );
             ui.add_space(6.0);
             ui.horizontal_wrapped(|ui| {
@@ -181,9 +178,9 @@ pub fn show(
             });
             ui.add_space(5.0);
             ui.label(
-                egui::RichText::new("Connectivity only — this does not test the proxy protocol.")
+                egui::RichText::new("Проверяются только DNS и TCP, не работа прокси-протокола.")
                     .size(11.0)
-                    .color(theme::MUTED),
+                    .color(theme::TEXT_MUTED),
             );
         }
     });
@@ -192,33 +189,33 @@ pub fn show(
 
 fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig, compact: bool) {
     let mut fields = vec![
-        ("Protocol", config.protocol.as_str().to_owned()),
-        ("Address", config.host.clone()),
-        ("Port", display_port(config)),
+        ("Протокол", config.protocol.as_str().to_owned()),
+        ("Адрес", config.host.clone()),
+        ("Порт", display_port(config)),
     ];
     if config.security != Security::Unknown {
-        fields.push(("Security", config.security.as_str().to_owned()));
+        fields.push(("Безопасность", config.security.as_str().to_owned()));
     }
     if config.transport != Transport::Unknown {
-        fields.push(("Transport", config.transport.as_str().to_owned()));
+        fields.push(("Транспорт", config.transport.as_str().to_owned()));
     }
     add_optional(&mut fields, "SNI", config.sni.as_deref());
     add_optional(&mut fields, "Fingerprint", config.fingerprint.as_deref());
     add_optional(
         &mut fields,
-        "Public key",
+        "Открытый ключ",
         config.reality_public_key.as_deref(),
     );
     add_optional(&mut fields, "Short ID", config.reality_short_id.as_deref());
     add_optional(&mut fields, "UUID", config.uuid.as_deref());
-    add_optional(&mut fields, "Username", config.username.as_deref());
-    add_optional(&mut fields, "Password", config.password.as_deref());
+    add_optional(&mut fields, "Имя пользователя", config.username.as_deref());
+    add_optional(&mut fields, "Пароль", config.password.as_deref());
     add_optional(&mut fields, "Flow", config.flow.as_deref());
-    add_optional(&mut fields, "Encryption", config.encryption.as_deref());
-    add_optional(&mut fields, "Path", config.path.as_deref());
+    add_optional(&mut fields, "Шифрование", config.encryption.as_deref());
+    add_optional(&mut fields, "Путь", config.path.as_deref());
     add_optional(&mut fields, "Host", config.host_header.as_deref());
-    add_optional(&mut fields, "Service name", config.service_name.as_deref());
-    add_optional(&mut fields, "Mode", config.mode.as_deref());
+    add_optional(&mut fields, "Имя сервиса", config.service_name.as_deref());
+    add_optional(&mut fields, "Режим", config.mode.as_deref());
     if !config.unknown_params.is_empty() {
         let extra = config
             .unknown_params
@@ -226,29 +223,62 @@ fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig, compact: bool) {
             .flat_map(|(key, values)| values.iter().map(move |value| format!("{key}={value}")))
             .collect::<Vec<_>>()
             .join(" · ");
-        fields.push(("Additional parameters", extra));
+        fields.push(("Дополнительные параметры", extra));
     }
 
-    egui::Grid::new(ui.id().with("configuration-fields"))
-        .num_columns(if compact { 2 } else { 4 })
-        .spacing(egui::vec2(18.0, 10.0))
-        .show(ui, |ui| {
-            for pair in fields.chunks(if compact { 1 } else { 2 }) {
-                for (label, value) in pair {
-                    ui.label(egui::RichText::new(*label).size(11.0).color(theme::MUTED));
+    if compact {
+        egui::Grid::new(ui.id().with("configuration-fields"))
+            .num_columns(2)
+            .spacing(egui::vec2(18.0, 10.0))
+            .show(ui, |ui| {
+                for (label, value) in &fields {
                     ui.label(
-                        egui::RichText::new(compact_value(value, 42))
-                            .size(12.0)
-                            .strong(),
+                        egui::RichText::new(*label)
+                            .size(11.0)
+                            .color(theme::TEXT_MUTED),
                     );
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(compact_value(value, 42))
+                                .size(12.0)
+                                .strong(),
+                        )
+                        .truncate(),
+                    )
+                    .on_hover_text(value);
+                    ui.end_row();
                 }
-                if pair.len() == 1 {
-                    ui.label("");
-                    ui.label("");
-                }
-                ui.end_row();
+            });
+    } else {
+        let split = fields.len().div_ceil(2);
+        let grid_id = ui.id();
+        ui.columns(2, |columns| {
+            for (column_index, chunk) in fields.chunks(split).enumerate() {
+                egui::Grid::new(grid_id.with(("configuration-fields", column_index)))
+                    .num_columns(2)
+                    .spacing(egui::vec2(14.0, 10.0))
+                    .show(&mut columns[column_index], |ui| {
+                        for (label, value) in chunk {
+                            ui.label(
+                                egui::RichText::new(*label)
+                                    .size(11.0)
+                                    .color(theme::TEXT_MUTED),
+                            );
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(compact_value(value, 80))
+                                        .size(12.0)
+                                        .strong(),
+                                )
+                                .truncate(),
+                            )
+                            .on_hover_text(value);
+                            ui.end_row();
+                        }
+                    });
             }
         });
+    }
 }
 
 fn add_optional(
@@ -283,19 +313,19 @@ fn is_json_payload(config: &ProxyConfig) -> bool {
 fn status_badge(ui: &mut egui::Ui, label: &str, status: &crate::diagnostics::CheckStatus) {
     let (text, fill, color) = match status {
         crate::diagnostics::CheckStatus::Passed => (
-            format!("{label}  PASS"),
+            format!("{label}  УСПЕШНО"),
             theme::SUCCESS,
             egui::Color32::WHITE,
         ),
         crate::diagnostics::CheckStatus::Failed(error) => (
-            format!("{label}  FAIL: {}", compact_value(error, 28)),
+            format!("{label}  ОШИБКА: {}", compact_value(error, 28)),
             egui::Color32::from_rgba_unmultiplied(241, 107, 107, 35),
             theme::ERROR,
         ),
         crate::diagnostics::CheckStatus::Skipped => (
-            format!("{label}  SKIPPED"),
+            format!("{label}  ПРОПУЩЕНО"),
             theme::SURFACE_RAISED,
-            theme::MUTED,
+            theme::TEXT_SECONDARY,
         ),
     };
     theme::badge(ui, &text, fill, color);

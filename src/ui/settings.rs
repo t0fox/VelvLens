@@ -15,56 +15,53 @@ pub struct SettingsViewResult {
 pub fn show(ui: &mut egui::Ui, settings: &mut AppSettings) -> SettingsViewResult {
     let mut result = SettingsViewResult::default();
     theme::surface_frame(theme::SURFACE).show(ui, |ui| {
-        ui.label(egui::RichText::new("Settings").size(18.0).strong());
+        ui.label(egui::RichText::new("Настройки").size(18.0).strong());
         ui.label(
-            egui::RichText::new("Control history and resolver limits for this session.")
+            egui::RichText::new("История ссылок и лимиты локального анализа.")
                 .size(12.0)
-                .color(theme::MUTED),
+                .color(theme::TEXT_SECONDARY),
         );
         ui.add_space(14.0);
-        let history = ui.checkbox(
-            &mut settings.history_enabled,
-            "Enable protected URL history",
-        );
+        let history = ui.checkbox(&mut settings.history_enabled, "Сохранять историю ссылок");
         result.changed |= history.changed();
         result.history_toggled |= history.changed();
         ui.label(
             egui::RichText::new(if settings.history_enabled {
-                "Stored locally using Windows protection."
+                "Хранится локально с защитой Windows."
             } else {
-                "History is disabled and no URLs are stored."
+                "История отключена, ссылки не сохраняются."
             })
             .size(11.0)
-            .color(theme::MUTED),
+            .color(theme::TEXT_MUTED),
         );
         ui.add_space(6.0);
         let clear = ui.add_enabled(
             settings.history_enabled,
-            egui::Button::new("Clear history").fill(theme::SURFACE_RAISED),
+            egui::Button::new("Очистить историю").fill(theme::SURFACE_RAISED),
         );
         result.clear_history = clear.clicked();
         ui.add_space(10.0);
         egui::Frame::none()
             .fill(theme::CANVAS)
-            .rounding(egui::Rounding::same(8.0))
-            .inner_margin(egui::Margin::same(10.0))
+            .rounding(egui::Rounding::same(theme::RADIUS_INPUT))
+            .inner_margin(egui::Margin::same(theme::SPACE_12))
             .show(ui, |ui| {
                 result.changed |= ui
                     .add(
                         egui::Slider::new(&mut settings.resolver.max_depth, 1..=16)
-                            .text("Max recursion depth"),
+                            .text("Глубина рекурсии"),
                     )
                     .changed();
                 result.changed |= ui
                     .add(
                         egui::Slider::new(&mut settings.resolver.max_discovered_urls, 8..=512)
-                            .text("Max discovered URLs"),
+                            .text("Максимум найденных ссылок"),
                     )
                     .changed();
                 result.changed |= ui
                     .add(
                         egui::Slider::new(&mut settings.timeout_seconds, 2..=60)
-                            .text("Request timeout (seconds)"),
+                            .text("Таймаут запроса (секунды)"),
                     )
                     .changed();
             });
@@ -72,7 +69,7 @@ pub fn show(ui: &mut egui::Ui, settings: &mut AppSettings) -> SettingsViewResult
         if ui
             .add_sized(
                 [110.0, 34.0],
-                egui::Button::new("Close").fill(theme::SURFACE_RAISED),
+                egui::Button::new("Закрыть").fill(theme::SURFACE_RAISED),
             )
             .clicked()
         {

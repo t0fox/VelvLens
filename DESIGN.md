@@ -1,52 +1,96 @@
 # SubLens visual system
 
-SubLens is a desktop inspection tool. The interface is a focused workspace, not a marketing page or a dashboard mosaic.
+SubLens is a compact Windows desktop inspector for proxy subscriptions. It is
+a focused tool for resolving, filtering, selecting, inspecting, and exporting
+configurations — not a dashboard and not a marketing surface.
 
-## Direction
+## Product direction
 
-- Dark navy application canvas with calm elevation between surfaces.
-- Violet is the single action accent and is reserved for the primary analysis action, selected filters, and selected configuration.
-- Green communicates completed pipeline stages and healthy diagnostics. Amber and red are reserved for warnings and failures.
-- The first viewport is compact-first: identity, source input, analysis action, one-line pipeline status, then the current page.
-- Below the layout budget, the catalog and inspector are separate screens with an explicit Back action. On wide windows they become a dense catalog plus inspector split.
-- The compact list is the primary navigation surface; the whole profile row is clickable and selection mode is a separate, explicit state.
+- Calm dark workspace with one violet action accent.
+- Dense catalog rows that remain readable at `520×550`.
+- The whole profile row is the navigation target; explicit selection mode is
+  used for bulk actions.
+- Compact windows show one page at a time (catalog or details); wide windows
+  show catalog and details side by side.
+- All visible copy is Russian. Technical protocol names and configuration
+  values remain unchanged: `VLESS`, `VMess`, `Trojan`, `Shadowsocks`,
+  `Hysteria2`, `TUIC`, `REALITY`, `TLS`, `TCP`, `XHTTP`, `QUIC`, `JSON`,
+  `Base64`, `SNI`, `UUID`, `Host`, and `Fingerprint`.
 
-## Tokens
+## Color tokens
 
 | Token | Value | Use |
 | --- | --- | --- |
-| Canvas | `#0B111C` | Window and working area |
-| Surface | `#121A27` | Panels and cards |
-| Raised surface | `#182233` | Hover and selected controls |
-| Border | `#27364B` | Quiet separation |
-| Text | `#F4F7FB` | Primary content |
-| Muted text | `#8D9AAF` | Labels and secondary metadata |
-| Accent | `#7C3AED` | Primary action and selected state |
-| Accent hover | `#8B5CF6` | Hover and pressed feedback |
-| Success | `#35D07F` | Passed stages and healthy status |
-| Warning | `#E7AD3C` | Slow or attention state |
-| Error | `#F16B6B` | Failed operations |
+| Background | `#111721` | Window and working area |
+| Surface | `#1B2330` | Panels and cards |
+| Surface hover | `#252E40` | Hovered and raised controls |
+| Surface selected | `#29213F` | Selected profile/filter |
+| Border | `#333D50` | Quiet separation |
+| Border selected | `#8B5CF6` | Selected card and focus |
+| Text primary | `#F3F4F8` | Titles and values |
+| Text secondary | `#AAB5C8` | Metadata and secondary controls |
+| Text muted | `#8793A7` | Labels and hints |
+| Accent | `#7C3AED` | Primary actions |
+| Accent hover | `#9061F9` | Hover and focus feedback |
+| Success | `#4ADE80` | Completed stages and healthy status |
+| Warning | `#F5B942` | Attention and running state |
+| Error | `#F87171` | Failed operations |
+
+## Geometry and typography
+
+All geometry is centralized in `src/ui/theme.rs`:
+
+| Token | Value |
+| --- | --- |
+| Window/panel/card radius | `12px` |
+| Input/button radius | `10px` |
+| Badge radius | `6px` |
+| Rhythm | `2 / 4 / 6 / 8 / 12 / 16 / 24px` |
+| Dense card height | `68px` |
+
+On Windows, the existing `Segoe UI` system font is placed first for the
+proportional family so Cyrillic and status glyphs render without squares; egui
+Ubuntu remains the fallback when the system font is unavailable. Titles use
+17–18px, card names 13–14px, body 12–13px, metadata 11–12px, and technical
+labels 10–11px.
 
 ## Interaction rules
 
-- Controls keep a visible hover state and a darker pressed state.
-- Primary buttons use a short press response and explicit status feedback.
-- No decorative motion is added to a repeated workflow. State transitions stay immediate and readable.
-- Long source URLs and hostnames stay in a single clipped line; the full value remains available through the existing copy actions.
-- Keyboard focus must remain visible through egui's native focus treatment.
-- Compact actions are kept in a More menu; the pinned bottom action is reserved for the current task (copy or bulk copy).
-- LTE filtering is a real three-state filter (All, Exclude LTE, Only LTE) and matches token boundaries in display names only.
-
-## Layout rhythm
-
-- Base spacing: 4px, 8px, 12px, 16px, 24px.
-- Outer panel padding: 16px.
-- Catalog row gap: 8px.
-- Small radius: 6px for controls and badges.
-- Surface radius: 12px for inspector and configuration cards.
+- Normal, hover, pressed, selected, disabled, and focus-visible states are
+  defined centrally through egui visuals.
+- Search is a raised rounded field with a search icon and the placeholder
+  `Поиск конфигурации...`. LTE filtering is exposed as `Все`, `Без LTE`, and
+  `Только LTE`; the old `-LTE` hint is not shown in the interface.
+- Normal catalog mode has one `Выбрать` action. Selection mode exposes
+  `Все видимые`, the selected count, `Действия`, `Готово`, and a bottom bulk
+  copy action.
+- Long hosts, keys, and URIs are clipped in dense layouts with the full value
+  available on hover or through copy. Secrets are not masked on the details
+  page and are never logged.
+- The bottom action panel is reserved for the current task and reports
+  `Скопировано` after a successful copy; the status uses text rather than a
+  font-dependent symbol so Windows never renders a square glyph.
+- Repeated workflows use immediate state changes; no decorative animation is
+  added. Focus and hover states remain visible and keyboard reachable.
 
 ## Responsive budget
 
-- Compact layout: below `1000` logical px. The list and details are separate pages, each with its own vertical scroll state.
-- Wide layout: `1000` logical px and above. The catalog starts at 286px and the inspector keeps a readable working width.
-- The threshold reflects the minimum catalog, readable detail surface, gutters, and splitter; it is a layout budget rather than a device class.
+- Default window: `800×600`.
+- Minimum window: `520×450`.
+- Compact mode: below `1000px`; target review sizes are `520×550`,
+  `640×480`, and `800×600`.
+- Wide mode: `1000px` and above; the catalog remains between `286px` and
+  `420px`, with a readable details surface beside it.
+- Scrollable lists use egui's row virtualization and keep the catalog wheel
+  responsive even when the pointer is over search/filter chrome.
+
+## Decisions
+
+- Visual redesign changes presentation and interaction density only. Resolver,
+  parser, protocol support, deduplication, export, and local-only processing
+  remain the existing owners.
+- No framework, network service, compatibility UI, or second theme system was
+  introduced.
+- The design is reviewed with the offscreen visual fixture when native GUI
+  automation is unavailable; such screenshots are explicitly labeled as
+  fixture evidence.

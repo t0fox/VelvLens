@@ -28,7 +28,7 @@ pub fn pipeline_strip(
                 pipeline_step(
                     ui,
                     &format!(
-                        "Decoded {}",
+                        "Декодировано: {}",
                         stage_found(report, |kind| {
                             matches!(kind, crate::resolver::stage::StageKind::Decode)
                         })
@@ -41,7 +41,7 @@ pub fn pipeline_strip(
                 pipeline_step(
                     ui,
                     &format!(
-                        "Extracted {}",
+                        "Извлечено: {}",
                         stage_found(report, |kind| {
                             matches!(kind, crate::resolver::stage::StageKind::Extract)
                         })
@@ -53,16 +53,16 @@ pub fn pipeline_strip(
                 ui.separator();
                 pipeline_step(
                     ui,
-                    &format!("Parsed {}", report.configs.len()),
+                    &format!("Разобрано: {}", report.configs.len()),
                     stage_status(report, |kind| {
                         matches!(kind, crate::resolver::stage::StageKind::Parse)
                     }),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
-                        egui::RichText::new(format!("{} unique", report.configs.len()))
+                        egui::RichText::new(format!("Уникальных: {}", report.configs.len()))
                             .size(11.0)
-                            .color(theme::MUTED),
+                            .color(theme::TEXT_MUTED),
                     );
                 });
             });
@@ -71,7 +71,7 @@ pub fn pipeline_strip(
         let message = if running {
             status.to_owned()
         } else {
-            "Ready · all analysis stays local".to_owned()
+            "Готово · анализ выполнен локально".to_owned()
         };
         theme::control_frame(theme::SURFACE).show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -88,7 +88,11 @@ pub fn pipeline_strip(
                         StatusMark::Success
                     },
                 );
-                ui.label(egui::RichText::new(message).size(11.0).color(theme::MUTED));
+                ui.label(
+                    egui::RichText::new(message)
+                        .size(11.0)
+                        .color(theme::TEXT_SECONDARY),
+                );
             });
         });
     }
@@ -118,17 +122,17 @@ pub fn compact_pipeline(
                 );
                 ui.label(
                     egui::RichText::new(if failed {
-                        "Analysis failed"
+                        "Анализ завершился с ошибкой"
                     } else {
-                        "Analysis complete"
+                        "Анализ завершён"
                     })
                     .size(11.0)
                     .color(if failed { theme::ERROR } else { theme::TEXT }),
                 );
                 ui.label(
-                    egui::RichText::new(format!("· {} configurations", report.configs.len()))
+                    egui::RichText::new(format!("· Конфигураций: {}", report.configs.len()))
                         .size(11.0)
-                        .color(theme::MUTED),
+                        .color(theme::TEXT_MUTED),
                 );
             } else {
                 status_mark(
@@ -147,15 +151,15 @@ pub fn compact_pipeline(
                 ui.label(
                     egui::RichText::new(if running {
                         if status.is_empty() {
-                            "Analyzing…"
+                            "Анализ…"
                         } else {
                             status
                         }
                     } else {
-                        "Ready"
+                        "Готово"
                     })
                     .size(11.0)
-                    .color(theme::MUTED),
+                    .color(theme::TEXT_MUTED),
                 );
             }
         });
@@ -163,15 +167,15 @@ pub fn compact_pipeline(
 }
 
 pub fn show(ui: &mut egui::Ui, report: &AnalysisReport) {
-    egui::CollapsingHeader::new("Processing inspector")
+    egui::CollapsingHeader::new("Инспектор обработки")
         .default_open(false)
         .show(ui, |ui| {
             ui.label(
                 egui::RichText::new(
-                    "The source was processed locally; no subscription contents were sent to a backend.",
+                    "Источник обработан локально; содержимое подписки не отправлялось на сервер.",
                 )
                 .size(11.0)
-                .color(theme::MUTED),
+                .color(theme::TEXT_MUTED),
             );
             ui.add_space(8.0);
             show_stages(ui, report);
@@ -184,7 +188,7 @@ pub fn show_stages(ui: &mut egui::Ui, report: &AnalysisReport) {
             StageStatus::Success => (theme::SUCCESS, StatusMark::Success),
             StageStatus::Failed => (theme::ERROR, StatusMark::Failure),
             StageStatus::Running => (theme::WARNING, StatusMark::Pending),
-            StageStatus::Skipped => (theme::MUTED, StatusMark::Neutral),
+            StageStatus::Skipped => (theme::TEXT_MUTED, StatusMark::Neutral),
             StageStatus::Cancelled => (theme::WARNING, StatusMark::Pending),
         };
         ui.horizontal(|ui| {
@@ -197,7 +201,7 @@ pub fn show_stages(ui: &mut egui::Ui, report: &AnalysisReport) {
             ui.label(
                 egui::RichText::new(stage.preview.as_str())
                     .size(11.0)
-                    .color(theme::MUTED),
+                    .color(theme::TEXT_MUTED),
             );
         });
         if let Some(error) = &stage.error {
@@ -206,12 +210,16 @@ pub fn show_stages(ui: &mut egui::Ui, report: &AnalysisReport) {
     }
     if !report.redirect_chain.is_empty() {
         ui.add_space(12.0);
-        ui.label(egui::RichText::new("Redirect chain").size(12.0).strong());
+        ui.label(
+            egui::RichText::new("Цепочка перенаправлений")
+                .size(12.0)
+                .strong(),
+        );
         for hop in &report.redirect_chain {
             ui.label(
                 egui::RichText::new(format!("HTTP {}  {} → {}", hop.status, hop.from, hop.to))
                     .size(11.0)
-                    .color(theme::MUTED),
+                    .color(theme::TEXT_MUTED),
             );
         }
     }
@@ -223,11 +231,15 @@ fn pipeline_step(ui: &mut egui::Ui, label: &str, status: Option<StageStatus>) {
         Some(StageStatus::Failed) => (theme::ERROR, StatusMark::Failure),
         Some(StageStatus::Running) => (theme::WARNING, StatusMark::Pending),
         Some(StageStatus::Cancelled) => (theme::WARNING, StatusMark::Pending),
-        Some(StageStatus::Skipped) | None => (theme::MUTED, StatusMark::Neutral),
+        Some(StageStatus::Skipped) | None => (theme::TEXT_MUTED, StatusMark::Neutral),
     };
     ui.horizontal(|ui| {
         status_mark(ui, color, mark);
-        ui.label(egui::RichText::new(label).size(11.0).color(theme::MUTED));
+        ui.label(
+            egui::RichText::new(label)
+                .size(11.0)
+                .color(theme::TEXT_MUTED),
+        );
     });
 }
 
@@ -329,15 +341,15 @@ fn stage_found(
         .sum()
 }
 
-fn format_stage(kind: crate::resolver::stage::StageKind) -> &'static str {
+pub(crate) fn format_stage(kind: crate::resolver::stage::StageKind) -> &'static str {
     match kind {
-        crate::resolver::stage::StageKind::Http => "HTTP fetch",
-        crate::resolver::stage::StageKind::Redirect => "Redirect",
-        crate::resolver::stage::StageKind::Detection => "Content detection",
-        crate::resolver::stage::StageKind::Decode => "Base64 decode",
-        crate::resolver::stage::StageKind::Extract => "URI extraction",
-        crate::resolver::stage::StageKind::Parse => "Protocol parse",
-        crate::resolver::stage::StageKind::Deduplication => "Deduplication",
-        crate::resolver::stage::StageKind::Diagnostics => "Diagnostics",
+        crate::resolver::stage::StageKind::Http => "HTTP-запрос",
+        crate::resolver::stage::StageKind::Redirect => "Перенаправление",
+        crate::resolver::stage::StageKind::Detection => "Определение содержимого",
+        crate::resolver::stage::StageKind::Decode => "Декодирование Base64",
+        crate::resolver::stage::StageKind::Extract => "Извлечение URI",
+        crate::resolver::stage::StageKind::Parse => "Разбор протокола",
+        crate::resolver::stage::StageKind::Deduplication => "Удаление повторов",
+        crate::resolver::stage::StageKind::Diagnostics => "Диагностика",
     }
 }

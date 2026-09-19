@@ -1,18 +1,43 @@
 use eframe::egui;
 
-pub const CANVAS: egui::Color32 = egui::Color32::from_rgb(11, 17, 28);
-pub const SURFACE: egui::Color32 = egui::Color32::from_rgb(18, 26, 39);
-pub const SURFACE_RAISED: egui::Color32 = egui::Color32::from_rgb(24, 34, 51);
-pub const SURFACE_SELECTED: egui::Color32 = egui::Color32::from_rgb(35, 24, 70);
-pub const BORDER: egui::Color32 = egui::Color32::from_rgb(39, 54, 75);
-pub const BORDER_SELECTED: egui::Color32 = egui::Color32::from_rgb(124, 58, 237);
-pub const TEXT: egui::Color32 = egui::Color32::from_rgb(244, 247, 251);
-pub const MUTED: egui::Color32 = egui::Color32::from_rgb(163, 176, 196);
+// The product palette is intentionally small. Keeping every token here makes
+// the compact and wide layouts feel like the same application.
+pub const BACKGROUND: egui::Color32 = egui::Color32::from_rgb(17, 23, 33);
+pub const SURFACE: egui::Color32 = egui::Color32::from_rgb(27, 35, 48);
+pub const SURFACE_HOVER: egui::Color32 = egui::Color32::from_rgb(37, 46, 64);
+pub const SURFACE_SELECTED: egui::Color32 = egui::Color32::from_rgb(41, 33, 63);
+pub const BORDER: egui::Color32 = egui::Color32::from_rgb(51, 61, 80);
+pub const BORDER_SELECTED: egui::Color32 = egui::Color32::from_rgb(139, 92, 246);
+pub const TEXT_PRIMARY: egui::Color32 = egui::Color32::from_rgb(243, 244, 248);
+pub const TEXT_SECONDARY: egui::Color32 = egui::Color32::from_rgb(170, 181, 200);
+pub const TEXT_MUTED: egui::Color32 = egui::Color32::from_rgb(135, 147, 167);
 pub const ACCENT: egui::Color32 = egui::Color32::from_rgb(124, 58, 237);
-pub const ACCENT_HOVER: egui::Color32 = egui::Color32::from_rgb(139, 92, 246);
-pub const SUCCESS: egui::Color32 = egui::Color32::from_rgb(53, 208, 127);
-pub const WARNING: egui::Color32 = egui::Color32::from_rgb(231, 173, 60);
-pub const ERROR: egui::Color32 = egui::Color32::from_rgb(241, 107, 107);
+pub const ACCENT_HOVER: egui::Color32 = egui::Color32::from_rgb(144, 97, 249);
+pub const SUCCESS: egui::Color32 = egui::Color32::from_rgb(74, 222, 128);
+pub const WARNING: egui::Color32 = egui::Color32::from_rgb(245, 185, 66);
+pub const ERROR: egui::Color32 = egui::Color32::from_rgb(248, 113, 113);
+
+// Compatibility aliases keep the rendering code readable while all values
+// still come from the same token set.
+pub const CANVAS: egui::Color32 = BACKGROUND;
+pub const SURFACE_RAISED: egui::Color32 = SURFACE_HOVER;
+pub const TEXT: egui::Color32 = TEXT_PRIMARY;
+pub const MUTED: egui::Color32 = TEXT_SECONDARY;
+
+pub const RADIUS_WINDOW: f32 = 12.0;
+pub const RADIUS_PANEL: f32 = 12.0;
+pub const RADIUS_CARD: f32 = 12.0;
+pub const RADIUS_INPUT: f32 = 10.0;
+pub const RADIUS_BUTTON: f32 = 10.0;
+pub const RADIUS_BADGE: f32 = 6.0;
+
+pub const SPACE_2: f32 = 2.0;
+pub const SPACE_4: f32 = 4.0;
+pub const SPACE_6: f32 = 6.0;
+pub const SPACE_8: f32 = 8.0;
+pub const SPACE_12: f32 = 12.0;
+pub const SPACE_16: f32 = 16.0;
+pub const SPACE_24: f32 = 24.0;
 
 // Two-column mode needs roughly 300 px for the catalog, 620 px for readable
 // details, and the surrounding gutters. Below this layout budget, the list
@@ -23,25 +48,25 @@ pub fn surface_frame(fill: egui::Color32) -> egui::Frame {
     egui::Frame::none()
         .fill(fill)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .rounding(egui::Rounding::same(12.0))
-        .inner_margin(egui::Margin::same(16.0))
+        .rounding(egui::Rounding::same(RADIUS_PANEL))
+        .inner_margin(egui::Margin::same(SPACE_16))
 }
 
 pub fn control_frame(fill: egui::Color32) -> egui::Frame {
     egui::Frame::none()
         .fill(fill)
         .stroke(egui::Stroke::new(1.0_f32, BORDER))
-        .rounding(egui::Rounding::same(8.0))
-        .inner_margin(egui::Margin::symmetric(10.0, 7.0))
+        .rounding(egui::Rounding::same(RADIUS_INPUT))
+        .inner_margin(egui::Margin::symmetric(SPACE_12, SPACE_6))
 }
 
 pub fn badge(ui: &mut egui::Ui, text: &str, fill: egui::Color32, color: egui::Color32) {
     egui::Frame::none()
         .fill(fill)
-        .rounding(egui::Rounding::same(6.0))
-        .inner_margin(egui::Margin::symmetric(8.0, 3.0))
+        .rounding(egui::Rounding::same(RADIUS_BADGE))
+        .inner_margin(egui::Margin::symmetric(SPACE_8, SPACE_4))
         .show(ui, |ui| {
-            ui.label(egui::RichText::new(text).size(11.0).strong().color(color));
+            ui.label(egui::RichText::new(text).size(11.0).color(color));
         });
 }
 

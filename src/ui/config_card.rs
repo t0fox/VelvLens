@@ -31,13 +31,8 @@ pub fn show_with_mode(
         .port_range
         .clone()
         .unwrap_or_else(|| config.port.to_string());
-    let card_rect = egui::Rect::from_min_size(
-        ui.cursor().min,
-        egui::vec2(
-            ui.available_width(),
-            if selection_mode { 72.0 } else { 68.0 },
-        ),
-    );
+    let card_rect =
+        egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), 68.0));
     let hovered = ui
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|position| card_rect.contains(position));
@@ -59,29 +54,33 @@ pub fn show_with_mode(
     egui::Frame::none()
         .fill(fill)
         .stroke(stroke)
-        .rounding(egui::Rounding::same(9.0))
-        .inner_margin(egui::Margin::symmetric(10.0, 6.0))
+        .rounding(egui::Rounding::same(theme::RADIUS_CARD))
+        .inner_margin(egui::Margin::symmetric(theme::SPACE_12, theme::SPACE_6))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 protocol_mark(ui, config.protocol);
-                ui.add_space(7.0);
+                ui.add_space(theme::SPACE_8);
                 ui.vertical(|ui| {
-                    let name = config.name.as_deref().unwrap_or("Unnamed configuration");
+                    let name = config.name.as_deref().unwrap_or("Без названия");
                     ui.add(
-                        egui::Label::new(egui::RichText::new(name).size(13.0).strong()).truncate(),
+                        egui::Label::new(egui::RichText::new(name).size(13.5).strong()).truncate(),
                     )
                     .on_hover_text(name);
                     let host = format!("{}:{port}", config.host);
                     ui.add(
-                        egui::Label::new(egui::RichText::new(&host).size(10.0).color(theme::MUTED))
-                            .truncate(),
+                        egui::Label::new(
+                            egui::RichText::new(&host)
+                                .size(10.5)
+                                .color(theme::TEXT_MUTED),
+                        )
+                        .truncate(),
                     )
                     .on_hover_text(host);
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                     if selection_mode {
                         let mut checked = selected_for_export;
-                        if ui.checkbox(&mut checked, "Select").clicked() {
+                        if ui.checkbox(&mut checked, "Выбрать").clicked() {
                             selection_toggled = true;
                         }
                     }
@@ -100,7 +99,7 @@ pub fn show_with_mode(
                         ui,
                         config.security.as_str(),
                         theme::SURFACE_RAISED,
-                        theme::MUTED,
+                        theme::TEXT_SECONDARY,
                     );
                 }
                 if config.transport != crate::model::Transport::Unknown {
@@ -108,7 +107,7 @@ pub fn show_with_mode(
                         ui,
                         config.transport.as_str(),
                         theme::SURFACE_RAISED,
-                        theme::MUTED,
+                        theme::TEXT_SECONDARY,
                     );
                 }
                 if config.metadata.exact_duplicate_count > 1 {
@@ -129,7 +128,7 @@ pub fn show_with_mode(
     if response.has_focus() {
         ui.painter().rect_stroke(
             card_rect.expand(1.0),
-            egui::Rounding::same(9.0),
+            egui::Rounding::same(theme::RADIUS_CARD),
             egui::Stroke::new(2.0_f32, theme::ACCENT_HOVER),
         );
     }
@@ -142,7 +141,11 @@ pub fn show_with_mode(
 fn protocol_mark(ui: &mut egui::Ui, protocol: Protocol) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, egui::Rounding::same(8.0), protocol_fill(protocol));
+    painter.rect_filled(
+        rect,
+        egui::Rounding::same(theme::RADIUS_BADGE + 2.0),
+        protocol_fill(protocol),
+    );
     painter.text(
         rect.center(),
         egui::Align2::CENTER_CENTER,

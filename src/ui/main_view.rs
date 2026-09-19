@@ -93,6 +93,12 @@ pub fn show(
     };
     let compact = ctx.screen_rect().width() < theme::WIDE_BREAKPOINT;
 
+    ctx.layer_painter(egui::LayerId::background()).rect_filled(
+        ctx.screen_rect(),
+        egui::Rounding::ZERO,
+        theme::CANVAS,
+    );
+
     draw_header(
         ctx,
         input,
@@ -111,7 +117,7 @@ pub fn show(
                 .show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         ui.label(
-                            egui::RichText::new(format!("{} selected", selected_configs.len()))
+                            egui::RichText::new(format!("Выбрано: {}", selected_configs.len()))
                                 .strong(),
                         );
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -119,7 +125,7 @@ pub fn show(
                                 .add_enabled(
                                     !selected_configs.is_empty(),
                                     egui::Button::new(format!(
-                                        "Copy selected ({})",
+                                        "Скопировать выбранные ({})",
                                         selected_configs.len()
                                     ))
                                     .fill(theme::ACCENT),
@@ -140,9 +146,9 @@ pub fn show(
                     .frame(compact_bar_frame())
                     .show(ctx, |ui| {
                         let label = if copied_until.is_some() {
-                            "✓ Copied"
+                            "Скопировано"
                         } else {
-                            "Copy configuration"
+                            "Скопировать конфигурацию"
                         };
                         if ui
                             .add_sized(
@@ -219,7 +225,9 @@ fn draw_header(
     result: &mut MainViewResult,
 ) {
     egui::TopBottomPanel::top("header")
-        .min_height(if compact { 144.0 } else { 0.0 })
+        .resizable(false)
+        .show_separator_line(false)
+        .min_height(if compact { 136.0 } else { 0.0 })
         .frame(
             egui::Frame::none()
                 .fill(theme::CANVAS)
@@ -244,17 +252,36 @@ fn draw_header(
                 );
                 if compact {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.menu_button("More", |ui| {
-                            if ui.button("Settings").clicked() {
+                        ui.menu_button("Ещё", |ui| {
+                            if ui.button("Настройки").clicked() {
                                 result.open_settings = true;
                                 ui.close_menu();
                             }
                             if ui
-                                .add_enabled(report.is_some(), egui::Button::new("Export"))
+                                .add_enabled(report.is_some(), egui::Button::new("Экспорт"))
                                 .clicked()
                             {
                                 result.open_export = true;
                                 ui.close_menu();
+                            }
+                            ui.separator();
+                            let inspector_id = egui::Id::new("inspector-visible");
+                            let mut inspector_visible = ctx.data_mut(|data| {
+                                data.get_persisted::<bool>(inspector_id).unwrap_or(false)
+                            });
+                            if ui
+                                .add_enabled(
+                                    report.is_some(),
+                                    egui::Checkbox::new(
+                                        &mut inspector_visible,
+                                        "Инспектор обработки",
+                                    ),
+                                )
+                                .changed()
+                            {
+                                ctx.data_mut(|data| {
+                                    data.insert_persisted(inspector_id, inspector_visible);
+                                });
                             }
                         });
                     });
@@ -263,34 +290,58 @@ fn draw_header(
                         if ui
                             .add_enabled(
                                 report.is_some(),
-                                egui::Button::new("Export").fill(theme::SURFACE_RAISED),
+                                egui::Button::new("Экспорт").fill(theme::SURFACE_RAISED),
                             )
                             .clicked()
                         {
                             result.open_export = true;
                         }
                         if ui
-                            .add(egui::Button::new("Settings").fill(theme::SURFACE_RAISED))
+                            .add(egui::Button::new("Настройки").fill(theme::SURFACE_RAISED))
                             .clicked()
                         {
                             result.open_settings = true;
                         }
+                        ui.menu_button("Ещё", |ui| {
+                            let inspector_id = egui::Id::new("inspector-visible");
+                            let mut inspector_visible = ctx.data_mut(|data| {
+                                data.get_persisted::<bool>(inspector_id).unwrap_or(false)
+                            });
+                            if ui
+                                .add_enabled(
+                                    report.is_some(),
+                                    egui::Checkbox::new(
+                                        &mut inspector_visible,
+                                        "Инспектор обработки",
+                                    ),
+                                )
+                                .changed()
+                            {
+                                ctx.data_mut(|data| {
+                                    data.insert_persisted(inspector_id, inspector_visible);
+                                });
+                            }
+                        });
                     });
                 }
             });
 
             if compact {
                 ui.add_space(6.0);
-                ui.horizontal_wrapped(|ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(input)
-                            .desired_width((ui.available_width() - 176.0).clamp(220.0, 420.0))
-                            .hint_text("Paste a subscription URL…"),
+                ui.horizontal(|ui| {
+                    let paste_width = 72.0;
+                    let analyze_width = 116.0;
+                    let input_width =
+                        (ui.available_width() - paste_width - analyze_width - theme::SPACE_16)
+                            .max(140.0);
+                    ui.add_sized(
+                        [input_width, 32.0],
+                        egui::TextEdit::singleline(input).hint_text("Вставьте ссылку на подписку…"),
                     );
                     if ui
                         .add_sized(
-                            [64.0, 32.0],
-                            egui::Button::new("Paste").fill(theme::SURFACE_RAISED),
+                            [paste_width, 32.0],
+                            egui::Button::new("Вставить").fill(theme::SURFACE_RAISED),
                         )
                         .clicked()
                     {
@@ -302,14 +353,17 @@ fn draw_header(
                     }
                     if ui
                         .add_sized(
-                            [88.0, 32.0],
-                            egui::Button::new(if running { "Cancel" } else { "Analyze" }).fill(
-                                if running {
-                                    theme::SURFACE_RAISED
-                                } else {
-                                    theme::ACCENT
-                                },
-                            ),
+                            [analyze_width, 32.0],
+                            egui::Button::new(if running {
+                                "Отмена"
+                            } else {
+                                "Анализировать"
+                            })
+                            .fill(if running {
+                                theme::SURFACE_RAISED
+                            } else {
+                                theme::ACCENT
+                            }),
                         )
                         .clicked()
                     {
@@ -325,12 +379,12 @@ fn draw_header(
                     ui.horizontal(|ui| {
                         theme::badge(
                             ui,
-                            "OK",
+                            "Готово",
                             egui::Color32::from_rgba_unmultiplied(53, 208, 127, 35),
                             theme::SUCCESS,
                         );
                         ui.label(
-                            egui::RichText::new(format!("{} configurations", report.configs.len()))
+                            egui::RichText::new(format!("Конфигураций: {}", report.configs.len()))
                                 .size(11.0)
                                 .color(theme::MUTED),
                         );
@@ -338,12 +392,12 @@ fn draw_header(
                 } else {
                     let message = if running {
                         if status.is_empty() {
-                            "Analyzing…"
+                            "Анализ…"
                         } else {
                             status
                         }
                     } else {
-                        "Ready"
+                        "Готово"
                     };
                     ui.label(egui::RichText::new(message).size(11.0).color(theme::MUTED));
                 }
@@ -352,7 +406,7 @@ fn draw_header(
             ui.add_space(6.0);
             if !compact {
                 ui.label(
-                    egui::RichText::new("Source URL")
+                    egui::RichText::new("Ссылка источника")
                         .size(10.0)
                         .strong()
                         .color(theme::MUTED),
@@ -371,11 +425,11 @@ fn draw_header(
                     (ui.available_width() - history_width - action_width - 16.0).max(150.0);
                 ui.add_sized(
                     [input_width, if compact { 32.0 } else { 34.0 }],
-                    egui::TextEdit::singleline(input).hint_text("Paste a subscription URL…"),
+                    egui::TextEdit::singleline(input).hint_text("Вставьте ссылку на подписку…"),
                 );
                 if !history.is_empty() {
                     egui::ComboBox::from_id_salt("recent-history")
-                        .selected_text("Recent")
+                        .selected_text("Недавние")
                         .width(if compact { 66.0 } else { 78.0 })
                         .show_ui(ui, |ui| {
                             for url in history {
@@ -390,7 +444,7 @@ fn draw_header(
                         if compact { 64.0 } else { 94.0 },
                         if compact { 32.0 } else { 34.0 },
                     ],
-                    egui::Button::new("Paste").fill(theme::SURFACE_RAISED),
+                    egui::Button::new("Вставить").fill(theme::SURFACE_RAISED),
                 );
                 if paste.clicked() {
                     if let Ok(mut clipboard) = arboard::Clipboard::new() {
@@ -404,13 +458,16 @@ fn draw_header(
                         if compact { 88.0 } else { 142.0 },
                         if compact { 32.0 } else { 34.0 },
                     ],
-                    egui::Button::new(if running { "Cancel" } else { "Analyze" }).fill(
-                        if running {
-                            theme::SURFACE_RAISED
-                        } else {
-                            theme::ACCENT
-                        },
-                    ),
+                    egui::Button::new(if running {
+                        "Отмена"
+                    } else {
+                        "Анализировать"
+                    })
+                    .fill(if running {
+                        theme::SURFACE_RAISED
+                    } else {
+                        theme::ACCENT
+                    }),
                 );
                 if action.clicked() {
                     if running {
@@ -421,24 +478,20 @@ fn draw_header(
                 }
             });
             ui.add_space(6.0);
-            if compact {
-                ui.horizontal(|ui| {
-                    let message = if let Some(report) = report {
-                        format!("✓ {} configurations", report.configs.len())
-                    } else if running {
-                        if status.is_empty() {
-                            "Analyzing…".to_owned()
-                        } else {
-                            status.to_owned()
-                        }
+            ui.horizontal(|ui| {
+                let message = if let Some(report) = report {
+                    format!("Готово · Конфигураций: {}", report.configs.len())
+                } else if running {
+                    if status.is_empty() {
+                        "Анализ…".to_owned()
                     } else {
-                        "Ready".to_owned()
-                    };
-                    ui.label(egui::RichText::new(message).size(11.0).color(theme::MUTED));
-                });
-            } else {
-                inspector::pipeline_strip(ui, report, running, status);
-            }
+                        status.to_owned()
+                    }
+                } else {
+                    "Готово".to_owned()
+                };
+                ui.label(egui::RichText::new(message).size(11.0).color(theme::MUTED));
+            });
         });
 }
 
@@ -446,7 +499,8 @@ fn compact_bar_frame() -> egui::Frame {
     egui::Frame::none()
         .fill(theme::SURFACE)
         .stroke(egui::Stroke::new(1.0_f32, theme::BORDER))
-        .inner_margin(egui::Margin::symmetric(14.0, 8.0))
+        .rounding(egui::Rounding::same(theme::RADIUS_PANEL))
+        .inner_margin(egui::Margin::symmetric(theme::SPACE_12, theme::SPACE_6))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -484,7 +538,7 @@ fn show_compact(
                     empty_state(ui, status, running);
                     return;
                 };
-                if ui.button("‹  Back to configurations").clicked() {
+                if ui.button("‹  К списку конфигураций").clicked() {
                     *compact_page = CompactPage::ConfigList;
                 }
                 ui.add_space(8.0);
@@ -509,8 +563,14 @@ fn show_compact(
                         ) {
                             result.test = Some(report.configs[index].id.clone());
                         }
-                        ui.add_space(12.0);
-                        inspector::show(ui, report);
+                        let inspector_id = egui::Id::new("inspector-visible");
+                        let inspector_visible = ctx.data_mut(|data| {
+                            data.get_persisted::<bool>(inspector_id).unwrap_or(false)
+                        });
+                        if inspector_visible {
+                            ui.add_space(12.0);
+                            inspector::show(ui, report);
+                        }
                     });
             }
             CompactPage::ConfigList => {
@@ -617,9 +677,14 @@ fn show_wide(
                         ) {
                             result.test = Some(report.configs[index].id.clone());
                         }
-                        ui.add_space(12.0);
                     }
-                    inspector::show(ui, report);
+                    let inspector_id = egui::Id::new("inspector-visible");
+                    let inspector_visible = ctx
+                        .data_mut(|data| data.get_persisted::<bool>(inspector_id).unwrap_or(false));
+                    if inspector_visible {
+                        ui.add_space(12.0);
+                        inspector::show(ui, report);
+                    }
                 });
         });
 }
@@ -644,8 +709,11 @@ fn draw_catalog(
     result: &mut MainViewResult,
 ) {
     let Some(report) = report else {
-        ui.label(egui::RichText::new("Configurations").size(15.0).strong());
-        ui.label(egui::RichText::new("Analyze a source to populate the list.").color(theme::MUTED));
+        ui.label(egui::RichText::new("Конфигурации").size(15.0).strong());
+        ui.label(
+            egui::RichText::new("Запустите анализ, чтобы заполнить список.")
+                .color(theme::TEXT_SECONDARY),
+        );
         return;
     };
 
@@ -662,7 +730,7 @@ fn draw_catalog(
     );
     ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new("Configurations")
+            egui::RichText::new("Конфигурации")
                 .size(if compact { 15.0 } else { 16.0 })
                 .strong(),
         );
@@ -670,18 +738,18 @@ fn draw_catalog(
             ui,
             &report.configs.len().to_string(),
             theme::SURFACE_RAISED,
-            theme::MUTED,
+            theme::TEXT_SECONDARY,
         );
         if !selected_configs.is_empty() {
             theme::badge(
                 ui,
-                &format!("{} selected", selected_configs.len()),
+                &format!("Выбрано: {}", selected_configs.len()),
                 egui::Color32::from_rgba_unmultiplied(124, 58, 237, 36),
                 theme::ACCENT_HOVER,
             );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("Copy all").clicked() {
+            if ui.button("Скопировать все").clicked() {
                 result.copy_all = true;
             }
         });
@@ -693,10 +761,37 @@ fn draw_catalog(
     }
     ui.horizontal(|ui| {
         let filter_width = if compact { 78.0 } else { 96.0 };
-        ui.add_sized(
-            [(ui.available_width() - filter_width).max(120.0), 32.0],
-            egui::TextEdit::singleline(search).hint_text("Search name/host…  use -LTE to exclude"),
-        );
+        let search_width = (ui.available_width() - filter_width).max(120.0);
+        ui.allocate_ui(egui::vec2(search_width, 34.0), |ui| {
+            egui::Frame::none()
+                .fill(theme::SURFACE_HOVER)
+                .stroke(egui::Stroke::new(1.0_f32, theme::BORDER))
+                .rounding(egui::Rounding::same(theme::RADIUS_INPUT))
+                .inner_margin(egui::Margin::symmetric(theme::SPACE_8, theme::SPACE_4))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let (icon_rect, _) =
+                            ui.allocate_exact_size(egui::vec2(18.0, 22.0), egui::Sense::hover());
+                        let painter = ui.painter();
+                        let center = icon_rect.center() - egui::vec2(2.0, 2.0);
+                        painter.circle_stroke(
+                            center,
+                            5.0,
+                            egui::Stroke::new(1.5_f32, theme::TEXT_MUTED),
+                        );
+                        painter.line_segment(
+                            [center + egui::vec2(3.5, 3.5), center + egui::vec2(7.0, 7.0)],
+                            egui::Stroke::new(1.5_f32, theme::TEXT_MUTED),
+                        );
+                        ui.add_sized(
+                            [ui.available_width(), 24.0],
+                            egui::TextEdit::singleline(search)
+                                .frame(false)
+                                .hint_text("Поиск конфигурации..."),
+                        );
+                    });
+                });
+        });
         filter_menu(
             ui,
             report,
@@ -710,6 +805,79 @@ fn draw_catalog(
             compact,
         );
     });
+    let active_filter_badges = !protocol_filters.is_empty()
+        || security_filter.is_some()
+        || transport_filter.is_some()
+        || !matches!(connectivity_filter, ConnectivityFilter::All)
+        || !matches!(duplicate_filter, DuplicateFilter::All)
+        || !matches!(lte_filter, LteFilter::All);
+    if active_filter_badges {
+        ui.horizontal_wrapped(|ui| {
+            for protocol in Protocol::ALL {
+                if protocol_filters.contains(&protocol) {
+                    theme::badge(
+                        ui,
+                        protocol.as_str(),
+                        theme::SURFACE_SELECTED,
+                        theme::ACCENT_HOVER,
+                    );
+                }
+            }
+            if let Some(security) = *security_filter {
+                theme::badge(
+                    ui,
+                    security.as_str(),
+                    theme::SURFACE_RAISED,
+                    theme::TEXT_SECONDARY,
+                );
+            }
+            if let Some(transport) = *transport_filter {
+                theme::badge(
+                    ui,
+                    transport.as_str(),
+                    theme::SURFACE_RAISED,
+                    theme::TEXT_SECONDARY,
+                );
+            }
+            if !matches!(*connectivity_filter, ConnectivityFilter::All) {
+                theme::badge(
+                    ui,
+                    match *connectivity_filter {
+                        ConnectivityFilter::Passed => "Успешные",
+                        ConnectivityFilter::Failed => "Ошибки",
+                        ConnectivityFilter::NotChecked => "Не проверены",
+                        ConnectivityFilter::All => "",
+                    },
+                    theme::SURFACE_RAISED,
+                    theme::TEXT_SECONDARY,
+                );
+            }
+            if !matches!(*duplicate_filter, DuplicateFilter::All) {
+                theme::badge(
+                    ui,
+                    match *duplicate_filter {
+                        DuplicateFilter::Unique => "Уникальные",
+                        DuplicateFilter::Duplicates => "Повторы",
+                        DuplicateFilter::All => "",
+                    },
+                    theme::SURFACE_RAISED,
+                    theme::TEXT_SECONDARY,
+                );
+            }
+            if !matches!(*lte_filter, LteFilter::All) {
+                theme::badge(
+                    ui,
+                    if matches!(*lte_filter, LteFilter::Exclude) {
+                        "Без LTE"
+                    } else {
+                        "Только LTE"
+                    },
+                    theme::SURFACE_SELECTED,
+                    theme::ACCENT_HOVER,
+                );
+            }
+        });
+    }
     ui.add_space(7.0);
     if *selection_mode {
         selection_controls(
@@ -719,20 +887,20 @@ fn draw_catalog(
             selected_configs,
             selection_mode,
         );
-    } else if ui.button("Select configurations").clicked() {
+    } else if ui.button("Выбрать").clicked() {
         *selection_mode = true;
     }
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.label(
-            egui::RichText::new("Configuration list")
+            egui::RichText::new("Список конфигураций")
                 .size(10.0)
                 .strong()
                 .color(theme::MUTED),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
-                egui::RichText::new(format!("{} visible", visible_indices.len()))
+                egui::RichText::new(format!("Показано: {}", visible_indices.len()))
                     .size(10.0)
                     .color(theme::MUTED),
             );
@@ -751,7 +919,7 @@ fn draw_catalog(
     scroll_style.bar_outer_margin = 2.0;
     scroll_style.foreground_color = true;
     ui.spacing_mut().scroll = scroll_style;
-    let row_height = if *selection_mode { 78.0 } else { 74.0 };
+    let row_height = 74.0;
     let list_height = ui.available_height().max(120.0);
     let catalog_scroll_salt = if compact {
         "compact-config-list"
@@ -835,7 +1003,7 @@ fn catalog_wheel_target(ui: &mut egui::Ui, scroll_salt: &str) -> Option<f32> {
 
 fn protocol_chips(ui: &mut egui::Ui, report: &AnalysisReport, filters: &mut HashSet<Protocol>) {
     ui.horizontal_wrapped(|ui| {
-        filter_button(ui, "All", report.configs.len(), filters, None);
+        filter_button(ui, "Все", report.configs.len(), filters, None);
         for protocol in Protocol::ALL {
             let count = report
                 .configs
@@ -845,7 +1013,7 @@ fn protocol_chips(ui: &mut egui::Ui, report: &AnalysisReport, filters: &mut Hash
             if count > 0 || filters.contains(&protocol) {
                 let label = match protocol {
                     Protocol::Shadowsocks => "SS",
-                    Protocol::Unknown => "Other",
+                    Protocol::Unknown => "Другое",
                     _ => protocol.as_str(),
                 };
                 filter_button(ui, label, count, filters, Some(protocol));
@@ -877,19 +1045,23 @@ fn filter_menu(
     ui.menu_button(
         if compact {
             if active {
-                "Filters •"
+                "Фильтры ·"
             } else {
-                "Filters"
+                "Фильтры"
             }
         } else {
-            "More filters"
+            "Фильтры"
         },
         |ui| {
-            ui.label(egui::RichText::new("Protocol").strong().color(theme::MUTED));
+            ui.label(
+                egui::RichText::new("Протокол")
+                    .strong()
+                    .color(theme::TEXT_SECONDARY),
+            );
             if ui
                 .selectable_label(
                     protocol_filters.is_empty(),
-                    format!("All ({})", report.configs.len()),
+                    format!("Все ({})", report.configs.len()),
                 )
                 .clicked()
             {
@@ -915,14 +1087,14 @@ fn filter_menu(
             }
             ui.separator();
             ui.label(
-                egui::RichText::new("LTE names")
+                egui::RichText::new("LTE в названии")
                     .strong()
                     .color(theme::MUTED),
             );
             for (value, label) in [
-                (LteFilter::All, "All"),
-                (LteFilter::Exclude, "Exclude LTE"),
-                (LteFilter::Only, "Only LTE"),
+                (LteFilter::All, "Все"),
+                (LteFilter::Exclude, "Без LTE"),
+                (LteFilter::Only, "Только LTE"),
             ] {
                 if ui.selectable_label(*lte_filter == value, label).clicked() {
                     *lte_filter = value;
@@ -933,7 +1105,7 @@ fn filter_menu(
             select_transport(ui, transport_filter);
             select_connectivity(ui, connectivity_filter);
             select_duplicates(ui, duplicate_filter);
-            if ui.button("Reset filters").clicked() {
+            if ui.button("Сбросить фильтры").clicked() {
                 protocol_filters.clear();
                 search.clear();
                 *security_filter = None;
@@ -963,11 +1135,11 @@ fn selection_controls(
         .any(|index| selected_configs.contains(&report.configs[*index].id));
     ui.horizontal_wrapped(|ui| {
         let state_label = if all_visible {
-            "☑ All visible"
+            "Все видимые"
         } else if some_visible {
-            "— All visible"
+            "Часть видимых"
         } else {
-            "☐ All visible"
+            "Все видимые"
         };
         if ui
             .add_enabled(
@@ -985,15 +1157,24 @@ fn selection_controls(
                 }
             }
         }
-        if ui.button("Clear visible").clicked() {
-            for index in visible_indices {
-                selected_configs.remove(&report.configs[*index].id);
+        ui.label(
+            egui::RichText::new(format!("Выбрано: {}", selected_configs.len()))
+                .size(11.0)
+                .color(theme::TEXT_SECONDARY),
+        );
+        ui.menu_button("Действия", |ui| {
+            if ui.button("Снять выбор с видимых").clicked() {
+                for index in visible_indices {
+                    selected_configs.remove(&report.configs[*index].id);
+                }
+                ui.close_menu();
             }
-        }
-        if ui.button("Clear all").clicked() {
-            selected_configs.clear();
-        }
-        if ui.button("Done").clicked() {
+            if ui.button("Сбросить выбор").clicked() {
+                selected_configs.clear();
+                ui.close_menu();
+            }
+        });
+        if ui.button("Готово").clicked() {
             *selection_mode = false;
         }
     });
@@ -1042,11 +1223,11 @@ fn filter_button(
 fn select_security(ui: &mut egui::Ui, current: &mut Option<Security>) {
     egui::ComboBox::from_id_salt("security-filter")
         .selected_text(format!(
-            "Security: {}",
-            current.map(Security::as_str).unwrap_or("All")
+            "Безопасность: {}",
+            current.map(Security::as_str).unwrap_or("Все")
         ))
         .show_ui(ui, |ui| {
-            if ui.selectable_label(current.is_none(), "All").clicked() {
+            if ui.selectable_label(current.is_none(), "Все").clicked() {
                 *current = None;
             }
             for value in [
@@ -1068,11 +1249,11 @@ fn select_security(ui: &mut egui::Ui, current: &mut Option<Security>) {
 fn select_transport(ui: &mut egui::Ui, current: &mut Option<Transport>) {
     egui::ComboBox::from_id_salt("transport-filter")
         .selected_text(format!(
-            "Transport: {}",
-            current.map(Transport::as_str).unwrap_or("All")
+            "Транспорт: {}",
+            current.map(Transport::as_str).unwrap_or("Все")
         ))
         .show_ui(ui, |ui| {
-            if ui.selectable_label(current.is_none(), "All").clicked() {
+            if ui.selectable_label(current.is_none(), "Все").clicked() {
                 *current = None;
             }
             for value in [
@@ -1097,20 +1278,20 @@ fn select_transport(ui: &mut egui::Ui, current: &mut Option<Transport>) {
 fn select_connectivity(ui: &mut egui::Ui, current: &mut ConnectivityFilter) {
     egui::ComboBox::from_id_salt("connectivity-filter")
         .selected_text(format!(
-            "Connectivity: {}",
+            "Проверка: {}",
             match current {
-                ConnectivityFilter::All => "All",
-                ConnectivityFilter::Passed => "Passed",
-                ConnectivityFilter::Failed => "Failed",
-                ConnectivityFilter::NotChecked => "Not tested",
+                ConnectivityFilter::All => "Все",
+                ConnectivityFilter::Passed => "Успешные",
+                ConnectivityFilter::Failed => "Ошибки",
+                ConnectivityFilter::NotChecked => "Не проверены",
             }
         ))
         .show_ui(ui, |ui| {
             for (value, label) in [
-                (ConnectivityFilter::All, "All"),
-                (ConnectivityFilter::Passed, "Passed"),
-                (ConnectivityFilter::Failed, "Failed"),
-                (ConnectivityFilter::NotChecked, "Not tested"),
+                (ConnectivityFilter::All, "Все"),
+                (ConnectivityFilter::Passed, "Успешные"),
+                (ConnectivityFilter::Failed, "Ошибки"),
+                (ConnectivityFilter::NotChecked, "Не проверены"),
             ] {
                 if ui.selectable_label(*current == value, label).clicked() {
                     *current = value;
@@ -1122,18 +1303,18 @@ fn select_connectivity(ui: &mut egui::Ui, current: &mut ConnectivityFilter) {
 fn select_duplicates(ui: &mut egui::Ui, current: &mut DuplicateFilter) {
     egui::ComboBox::from_id_salt("duplicate-filter")
         .selected_text(format!(
-            "Duplicates: {}",
+            "Повторы: {}",
             match current {
-                DuplicateFilter::All => "All",
-                DuplicateFilter::Unique => "Unique",
-                DuplicateFilter::Duplicates => "Duplicates",
+                DuplicateFilter::All => "Все",
+                DuplicateFilter::Unique => "Уникальные",
+                DuplicateFilter::Duplicates => "Повторы",
             }
         ))
         .show_ui(ui, |ui| {
             for (value, label) in [
-                (DuplicateFilter::All, "All"),
-                (DuplicateFilter::Unique, "Unique"),
-                (DuplicateFilter::Duplicates, "Duplicates"),
+                (DuplicateFilter::All, "Все"),
+                (DuplicateFilter::Unique, "Уникальные"),
+                (DuplicateFilter::Duplicates, "Повторы"),
             ] {
                 if ui.selectable_label(*current == value, label).clicked() {
                     *current = value;
@@ -1264,15 +1445,15 @@ fn diagnostic_failed(result: &DiagnosticResult) -> bool {
 fn empty_catalog(ui: &mut egui::Ui, report: &AnalysisReport, filters: &HashSet<Protocol>) {
     theme::control_frame(theme::CANVAS).show(ui, |ui| {
         let title = if filters.len() == 1 && filters.contains(&Protocol::Hysteria2) {
-            "No Hysteria2 configurations"
+            "Конфигурации Hysteria2 не найдены"
         } else if report.configs.is_empty() {
-            "No configurations found"
+            "Конфигурации не найдены"
         } else {
-            "No matching configurations"
+            "Нет подходящих конфигураций"
         };
         ui.label(egui::RichText::new(title).strong());
         ui.label(
-            egui::RichText::new("Clear a filter or change the search query.")
+            egui::RichText::new("Сбросьте фильтр или измените поисковый запрос.")
                 .size(11.0)
                 .color(theme::MUTED),
         );
@@ -1286,14 +1467,14 @@ fn empty_state(ui: &mut egui::Ui, status: &str, running: bool) {
             if running {
                 ui.spinner();
                 ui.label(
-                    egui::RichText::new("Inspecting source…")
+                    egui::RichText::new("Проверяем источник…")
                         .size(17.0)
                         .strong(),
                 );
                 ui.label(egui::RichText::new(status).size(12.0).color(theme::MUTED));
-            } else if let Some(error) = status.strip_prefix("Analysis failed: ") {
+            } else if let Some(error) = status.strip_prefix("Ошибка анализа: ") {
                 ui.label(
-                    egui::RichText::new("Analysis could not complete")
+                    egui::RichText::new("Не удалось завершить анализ")
                         .size(17.0)
                         .strong()
                         .color(theme::ERROR),
@@ -1301,12 +1482,12 @@ fn empty_state(ui: &mut egui::Ui, status: &str, running: bool) {
                 ui.label(egui::RichText::new(error).size(12.0).color(theme::MUTED));
             } else {
                 ui.label(
-                    egui::RichText::new("Inspect a subscription locally")
+                    egui::RichText::new("Проверьте подписку локально")
                         .size(17.0)
                         .strong(),
                 );
                 ui.label(
-                    egui::RichText::new("Paste a source above to see its configurations.")
+                    egui::RichText::new("Вставьте ссылку выше, чтобы увидеть конфигурации.")
                         .size(12.0)
                         .color(theme::MUTED),
                 );
@@ -1322,7 +1503,7 @@ fn show_qr(
     qr: &mut Option<crate::qr::QrMatrix>,
 ) {
     let mut close = false;
-    egui::Window::new("QR code")
+    egui::Window::new("QR-код")
         .collapsible(false)
         .resizable(false)
         .frame(theme::surface_frame(theme::SURFACE))
@@ -1331,7 +1512,7 @@ fn show_qr(
             if ui
                 .add_sized(
                     [280.0, 34.0],
-                    egui::Button::new("Close").fill(theme::SURFACE_RAISED),
+                    egui::Button::new("Закрыть").fill(theme::SURFACE_RAISED),
                 )
                 .clicked()
             {

@@ -52,7 +52,7 @@ impl SubLensApp {
         let history = HistoryStore::load(settings.history_enabled);
         Self {
             input: String::new(),
-            status: "Ready · all analysis stays local".to_owned(),
+            status: "Готово · анализ выполняется локально".to_owned(),
             job_manager: JobManager::new().expect("Tokio runtime must start"),
             job: None,
             diagnostic_job: None,
@@ -82,7 +82,7 @@ impl SubLensApp {
     fn start(&mut self) {
         let url = self.input.trim().to_owned();
         if url.is_empty() {
-            self.status = "Enter an HTTP(S) subscription URL".to_owned();
+            self.status = "Введите HTTP(S)-ссылку на подписку".to_owned();
             return;
         }
         self.report = None;
@@ -107,7 +107,7 @@ impl SubLensApp {
             self.history = HistoryStore::load(true);
             self.history.append(&url);
         }
-        self.status = "Analyzing · HTTP → Decode → Extract → Parse".to_owned();
+        self.status = "Анализ · HTTP → Декодирование → Извлечение → Разбор".to_owned();
         let mut resolver = self.settings.resolver.clone();
         resolver.request_timeout = Duration::from_secs(self.settings.timeout_seconds);
         self.job = Some(self.job_manager.start_analysis(url, resolver));
@@ -120,13 +120,17 @@ impl SubLensApp {
         while let Ok(event) = job.receiver.try_recv() {
             changed = true;
             match event {
-                JobEvent::Started => self.status = "Fetching source…".to_owned(),
+                JobEvent::Started => self.status = "Получение источника…".to_owned(),
                 JobEvent::Stage(stage) => {
-                    self.status = format!("{:?} · {}", stage.kind, stage.preview);
+                    self.status = format!(
+                        "{} · {}",
+                        ui::inspector::format_stage(stage.kind),
+                        stage.preview
+                    );
                 }
                 JobEvent::Completed(report) => {
                     self.status = format!(
-                        "HTTP complete · Decode complete · {} configurations found",
+                        "HTTP готов · декодирование готово · найдено конфигураций: {}",
                         report.configs.len()
                     );
                     self.selected_config = report.configs.first().map(|config| config.id.clone());
@@ -135,11 +139,11 @@ impl SubLensApp {
                     finished = true;
                 }
                 JobEvent::Failed(error) => {
-                    self.status = format!("Analysis failed: {error}");
+                    self.status = format!("Ошибка анализа: {error}");
                     finished = true;
                 }
                 JobEvent::Cancelled => {
-                    self.status = "Analysis cancelled".to_owned();
+                    self.status = "Анализ отменён".to_owned();
                     finished = true;
                 }
                 JobEvent::DiagnosticCompleted(_) => {}
@@ -164,15 +168,15 @@ impl SubLensApp {
                     if let Some(index) = self.diagnostic_target {
                         self.diagnostics.insert(index, result);
                     }
-                    self.status = "Connectivity check complete · DNS/TCP only".to_owned();
+                    self.status = "Проверка соединения завершена · только DNS/TCP".to_owned();
                     finished = true;
                 }
                 JobEvent::Failed(error) => {
-                    self.status = format!("Connectivity check failed: {error}");
+                    self.status = format!("Ошибка проверки соединения: {error}");
                     finished = true;
                 }
                 JobEvent::Cancelled => {
-                    self.status = "Connectivity check cancelled".to_owned();
+                    self.status = "Проверка соединения отменена".to_owned();
                     finished = true;
                 }
                 JobEvent::Started | JobEvent::Stage(_) | JobEvent::Completed(_) => {}
@@ -197,7 +201,7 @@ impl SubLensApp {
         if let Some(job) = &self.diagnostic_job {
             job.cancel.cancel();
         }
-        self.status = "Testing connectivity · DNS → TCP…".to_owned();
+        self.status = "Проверка соединения · DNS → TCP…".to_owned();
         self.diagnostic_job = Some(
             self.job_manager
                 .start_diagnostic(config, Duration::from_secs(self.settings.timeout_seconds)),
@@ -218,7 +222,7 @@ impl eframe::App for SubLensApp {
         }
         let running = self.job.is_some();
         if self.show_settings {
-            egui::Window::new("Settings")
+            egui::Window::new("Настройки")
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
@@ -228,11 +232,11 @@ impl eframe::App for SubLensApp {
                     }
                     if settings_result.clear_history {
                         self.history.clear();
-                        self.status = "Protected URL history cleared".to_owned();
+                        self.status = "История ссылок очищена".to_owned();
                     }
                     if settings_result.changed {
                         if let Err(error) = self.settings.save() {
-                            self.status = format!("Settings could not be saved: {error}");
+                            self.status = format!("Не удалось сохранить настройки: {error}");
                         }
                     }
                     if settings_result.close {
@@ -242,7 +246,7 @@ impl eframe::App for SubLensApp {
         }
         if self.show_export {
             let mut close_export = false;
-            egui::Window::new("Export configurations")
+            egui::Window::new("Экспорт конфигураций")
                 .collapsible(false)
                 .resizable(false)
                 .frame(theme::surface_frame(theme::SURFACE))
@@ -254,7 +258,7 @@ impl eframe::App for SubLensApp {
                             .any(|config| is_json_payload(&config.raw_uri));
                         ui.label(
                             egui::RichText::new(format!(
-                                "{} configurations · choose a local export",
+                                "Конфигураций: {} · выберите локальный экспорт",
                                 report.configs.len()
                             ))
                             .size(12.0)
@@ -265,9 +269,9 @@ impl eframe::App for SubLensApp {
                             .add_sized(
                                 [250.0, 34.0],
                                 egui::Button::new(if has_json_payload {
-                                    "Copy raw configuration payloads"
+                                    "Скопировать исходные данные конфигураций"
                                 } else {
-                                    "Copy raw URI list"
+                                    "Скопировать список URI"
                                 })
                                 .fill(theme::SURFACE_RAISED),
                             )
@@ -280,9 +284,9 @@ impl eframe::App for SubLensApp {
                         let base64_export = ui.add_enabled(
                             !has_json_payload,
                             egui::Button::new(if has_json_payload {
-                                "Base64 unavailable for JSON"
+                                "Base64 недоступен для JSON"
                             } else {
-                                "Copy Base64 subscription"
+                                "Скопировать подписку Base64"
                             })
                             .fill(theme::SURFACE_RAISED),
                         );
@@ -294,7 +298,7 @@ impl eframe::App for SubLensApp {
                         if ui
                             .add_sized(
                                 [250.0, 34.0],
-                                egui::Button::new("Copy JSON").fill(theme::SURFACE_RAISED),
+                                egui::Button::new("Скопировать JSON").fill(theme::SURFACE_RAISED),
                             )
                             .clicked()
                         {
@@ -305,7 +309,7 @@ impl eframe::App for SubLensApp {
                         ui.add_space(8.0);
                         ui.label(
                             egui::RichText::new(
-                                "Raw exports include credentials only after this explicit action.",
+                                "Исходный экспорт включает учётные данные только после этого действия.",
                             )
                             .size(11.0)
                             .color(theme::MUTED),
@@ -315,7 +319,7 @@ impl eframe::App for SubLensApp {
                     if ui
                         .add_sized(
                             [250.0, 34.0],
-                            egui::Button::new("Close").fill(theme::SURFACE_RAISED),
+                            egui::Button::new("Закрыть").fill(theme::SURFACE_RAISED),
                         )
                         .clicked()
                     {
@@ -393,27 +397,58 @@ impl eframe::App for SubLensApp {
 }
 
 pub fn configure_style(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    if let Ok(font_bytes) = std::fs::read(r"C:\Windows\Fonts\segoeui.ttf") {
+        fonts.font_data.insert(
+            "Segoe UI".to_owned(),
+            egui::FontData::from_owned(font_bytes),
+        );
+        if let Some(proportional) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+            proportional.insert(0, "Segoe UI".to_owned());
+        }
+        ctx.set_fonts(fonts);
+    }
     let mut visuals = egui::Visuals::dark();
     visuals.window_fill = theme::CANVAS;
     visuals.panel_fill = theme::CANVAS;
-    visuals.extreme_bg_color = egui::Color32::from_rgb(8, 12, 20);
+    visuals.window_rounding = egui::Rounding::same(theme::RADIUS_WINDOW);
+    visuals.menu_rounding = egui::Rounding::same(theme::RADIUS_INPUT);
+    visuals.window_stroke = egui::Stroke::new(1.0_f32, theme::BORDER);
+    visuals.extreme_bg_color = egui::Color32::from_rgb(12, 16, 24);
     visuals.faint_bg_color = theme::SURFACE;
     visuals.override_text_color = Some(theme::TEXT);
     visuals.widgets.noninteractive.bg_fill = theme::SURFACE;
-    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, theme::MUTED);
+    visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, theme::BORDER);
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT_SECONDARY);
+    visuals.widgets.noninteractive.rounding = egui::Rounding::same(theme::RADIUS_INPUT);
     visuals.widgets.inactive.bg_fill = theme::SURFACE;
-    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT);
-    visuals.widgets.hovered.bg_fill = theme::SURFACE_RAISED;
-    visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT);
+    visuals.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
+    visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0_f32, theme::BORDER);
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT_PRIMARY);
+    visuals.widgets.inactive.rounding = egui::Rounding::same(theme::RADIUS_BUTTON);
+    visuals.widgets.hovered.bg_fill = theme::SURFACE_HOVER;
+    visuals.widgets.hovered.weak_bg_fill = theme::SURFACE_HOVER;
+    visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0_f32, theme::ACCENT_HOVER);
+    visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0_f32, theme::TEXT_PRIMARY);
+    visuals.widgets.hovered.rounding = egui::Rounding::same(theme::RADIUS_BUTTON);
     visuals.widgets.active.bg_fill = theme::ACCENT;
+    visuals.widgets.active.weak_bg_fill = theme::ACCENT;
+    visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0_f32, theme::ACCENT_HOVER);
     visuals.widgets.active.fg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
+    visuals.widgets.active.rounding = egui::Rounding::same(theme::RADIUS_BUTTON);
+    visuals.widgets.open = visuals.widgets.hovered;
     visuals.selection.bg_fill = theme::ACCENT;
     visuals.selection.stroke = egui::Stroke::new(1.0_f32, egui::Color32::WHITE);
+    visuals.hyperlink_color = theme::ACCENT_HOVER;
+    visuals.button_frame = true;
+    visuals.collapsing_header_frame = false;
     ctx.set_visuals(visuals);
     let mut style = (*ctx.style()).clone();
-    style.spacing.item_spacing = egui::vec2(8.0, 6.0);
-    style.spacing.button_padding = egui::vec2(12.0, 8.0);
+    style.spacing.item_spacing = egui::vec2(theme::SPACE_8, theme::SPACE_6);
+    style.spacing.button_padding = egui::vec2(theme::SPACE_12, theme::SPACE_6);
     style.spacing.interact_size = egui::vec2(44.0, 34.0);
+    style.spacing.menu_margin = egui::Margin::same(theme::SPACE_6);
+    style.spacing.indent = 16.0;
     ctx.set_style(style);
 }
 

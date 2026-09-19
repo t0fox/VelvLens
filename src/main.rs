@@ -6,8 +6,8 @@ fn main() -> eframe::Result {
         .init();
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
-            .with_inner_size([1120.0, 720.0])
-            .with_min_inner_size([980.0, 640.0]),
+            .with_inner_size([800.0, 600.0])
+            .with_min_inner_size([520.0, 450.0]),
         renderer: eframe::Renderer::Wgpu,
         ..Default::default()
     };
