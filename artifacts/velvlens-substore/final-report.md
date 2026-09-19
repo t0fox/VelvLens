@@ -1,7 +1,7 @@
 # VelvLens Sub-Store migration report
 
-Generated: 2026-09-19T15:57:22.756Z
-Git HEAD: `3f9da989e6344935aaf48a0bacde8ab8fd414208`
+Generated: 2026-09-19T16:08:52.983Z
+Git HEAD: `587f8dbd5a599e5989b58b698035c1cc2aef2889`
 
 ## Pinned embedding
 
@@ -21,20 +21,23 @@ Git HEAD: `3f9da989e6344935aaf48a0bacde8ab8fd414208`
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| VelvLens Setup 0.2.0.exe | 137371865 | `4c73c7df38c713f26654abae3ebae3af0c08a8e9e77a3fee52f9ea89d5c41c82` |
-| VelvLens-portable.exe | 137145267 | `9b2ceca6ddee71f32651bd0ff1fea84384b2c28b889f18e2d963b6cba7ca1624` |
+| VelvLens Setup 0.2.0.exe | 137371902 | `557f0bf3f68fb36666efaad547975474861f31766f8dd21ccd5bfbc89306d112` |
+| VelvLens-portable.exe | 137145305 | `995635fd2d53f9a68e958f13ee663526490a4d152798ee1aa28dc6770b769873` |
 
-Package verification requires the staged backend/frontend, Node runtime hash,
+Package verification: PASS — the staged backend/frontend, Node runtime hash,
 license notices, exact manifest pins, no `node_modules`, and no legacy Rust
-executable/source entries in the packaged app. It is run with
-`pnpm verify:package` after the Windows build.
+executable/source entries were checked with `pnpm verify:package` after the
+Windows build.
 
 ## Functional evidence
 
-- Focused Electron tests: run with `pnpm test:electron`.
-- Sub-Store fixture smoke: run with `pnpm smoke:substore`; fixture export is decoded only in memory.
-- Electron lifecycle smoke: run with `pnpm smoke:electron`; it observes BrowserWindow readiness and backend shutdown.
-- Clean-install portable EXE: NOT RUN — requires a fresh-directory portable EXE check.
+- Focused Electron tests: PASS (15/15) with `pnpm test:electron`.
+- Sub-Store fixture smoke: PASS with VLESS, Base64, Hysteria2, JSON, and mixed
+  fixtures; list retrieval and V2Ray export were verified with
+  `pnpm smoke:substore`. Fixture export is decoded only in memory.
+- Electron lifecycle smoke: PASS with `pnpm smoke:electron`; it observes
+  BrowserWindow readiness and backend shutdown.
+- Clean-install portable EXE: PASS (reported by the clean-install gate).
 - Final visual/accessibility approval: separate human review gate, not inferred from smoke tests.
 
 ## Source and licensing

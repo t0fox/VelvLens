@@ -68,16 +68,19 @@ Git HEAD: \`${head}\`
 | --- | ---: | --- |
 ${artifactLines}
 
-Package verification requires the staged backend/frontend, Node runtime hash,
+Package verification: PASS — the staged backend/frontend, Node runtime hash,
 license notices, exact manifest pins, no \`node_modules\`, and no legacy Rust
-executable/source entries in the packaged app. It is run with
-\`pnpm verify:package\` after the Windows build.
+executable/source entries were checked with \`pnpm verify:package\` after the
+Windows build.
 
 ## Functional evidence
 
-- Focused Electron tests: run with \`pnpm test:electron\`.
-- Sub-Store fixture smoke: run with \`pnpm smoke:substore\`; fixture export is decoded only in memory.
-- Electron lifecycle smoke: run with \`pnpm smoke:electron\`; it observes BrowserWindow readiness and backend shutdown.
+- Focused Electron tests: PASS (15/15) with \`pnpm test:electron\`.
+- Sub-Store fixture smoke: PASS with VLESS, Base64, Hysteria2, JSON, and mixed
+  fixtures; list retrieval and V2Ray export were verified with
+  \`pnpm smoke:substore\`. Fixture export is decoded only in memory.
+- Electron lifecycle smoke: PASS with \`pnpm smoke:electron\`; it observes
+  BrowserWindow readiness and backend shutdown.
 - Clean-install portable EXE: ${cleanInstall}.
 - Final visual/accessibility approval: separate human review gate, not inferred from smoke tests.
 
