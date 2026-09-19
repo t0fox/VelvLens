@@ -21,8 +21,11 @@ Git HEAD at evidence generation: `007181cfe7b5db77f0f29a80bccbe6fcab6494f0`
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| VelvLens Setup 0.2.0.exe | 137371989 | `395a165f8e4d0253e461bff2395cde935f108706c03e62e7822bcfbccd6059e7` |
 | VelvLens-portable.exe | 137145387 | `c1a5df4eb838a7de7d4657ac6df42dc9be38ab2e32cb6564cdb7f766b49e19c6` |
+
+The final `release` directory intentionally retains only the portable EXE;
+installer and electron-builder staging outputs were removed from the
+distribution directory after verification.
 
 Package verification: PASS — the staged backend/frontend, Node runtime hash,
 license notices, exact manifest pins, no `node_modules`, and no legacy Rust
