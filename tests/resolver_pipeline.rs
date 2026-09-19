@@ -44,6 +44,9 @@ hysteria2://synthetic-password@hy.example:443?sni=hy.example",
             "{{\"items\":[\"vless://12345678-1234-1234-1234-123456789abc@direct.example:443\",\"{}\"]}}",
             encoded
         );
+        let json_profile = format!(
+            "{{\"remarks\":\"structured\",\"outbounds\":[{{\"protocol\":\"vless\",\"settings\":{{\"vnext\":[{{\"address\":\"structured.example\",\"port\":443,\"users\":[{{\"id\":\"00000000-0000-4000-8000-000000000001\"}}]}}]}}}}],\"routing\":{{\"rules\":[{{\"domain\":[\"http://{address}/must-not-fetch\"]}}]}}}}"
+        );
         let happ_body = "hysteria2://synthetic-password@happ.example:443?port=1234,5000-6000";
         let responses = Arc::new(HashMap::from([
             (
@@ -53,10 +56,18 @@ hysteria2://synthetic-password@hy.example:443?sni=hy.example",
             (
                 "/nested",
                 format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                body.len(),
-                body
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                ),
             ),
+            (
+                "/json-profile",
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    json_profile.len(),
+                    json_profile
+                ),
             ),
             (
                 "/loop",
@@ -211,6 +222,23 @@ async fn follows_redirects_and_nested_payloads_without_looping() {
         .map(|stage| stage.found)
         .sum::<usize>();
     assert_eq!(parsed, 2);
+}
+
+#[tokio::test]
+async fn structured_json_does_not_turn_routing_urls_into_sources() {
+    let server = TestServer::start().await;
+    let report = Resolver::new(reqwest::Client::new(), ResolverConfig::default())
+        .analyze(&server.url("/json-profile"), CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert_eq!(report.configs.len(), 1);
+    assert_eq!(report.configs[0].protocol, Protocol::Vless);
+    assert_eq!(report.discovered_urls, 1);
+    assert!(!report
+        .stages
+        .iter()
+        .any(|stage| stage.preview.contains("must-not-fetch")));
 }
 
 #[tokio::test]

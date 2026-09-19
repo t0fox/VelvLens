@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -71,6 +71,130 @@ pub enum Transport {
     Unknown,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OriginalRepresentation {
+    ShareUri(String),
+    JsonProfile {
+        document: Arc<str>,
+        profile_index: usize,
+        outbound_index: usize,
+        endpoint_index: usize,
+    },
+}
+
+impl OriginalRepresentation {
+    pub fn json_profile(
+        document: Arc<str>,
+        profile_index: usize,
+        outbound_index: usize,
+        endpoint_index: usize,
+    ) -> Self {
+        Self::JsonProfile {
+            document,
+            profile_index,
+            outbound_index,
+            endpoint_index,
+        }
+    }
+
+    pub fn text(&self) -> &str {
+        match self {
+            Self::ShareUri(uri) => uri,
+            Self::JsonProfile { document, .. } => document,
+        }
+    }
+
+    pub fn is_json(&self) -> bool {
+        matches!(self, Self::JsonProfile { .. })
+    }
+
+    pub fn identity_key(&self) -> String {
+        match self {
+            Self::ShareUri(uri) => format!("uri:{uri}"),
+            Self::JsonProfile {
+                document,
+                profile_index,
+                outbound_index,
+                endpoint_index,
+            } => {
+                let digest = Sha256::digest(document.as_bytes());
+                format!("json:{digest:x}:{profile_index}:{outbound_index}:{endpoint_index}")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConversionLimitation {
+    MissingRequired { field: String },
+    UnsupportedParameter { field: String },
+    AmbiguousParameter { field: String },
+    InvalidValue { field: String },
+}
+
+impl fmt::Display for ConversionLimitation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingRequired { field } => {
+                write!(formatter, "Не указан обязательный параметр: {field}")
+            }
+            Self::UnsupportedParameter { field } => {
+                write!(formatter, "Параметр не поддерживается share URI: {field}")
+            }
+            Self::AmbiguousParameter { field } => write!(
+                formatter,
+                "Параметр нельзя однозначно перенести в share URI: {field}"
+            ),
+            Self::InvalidValue { field } => {
+                write!(formatter, "Некорректное значение параметра: {field}")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ShareUriResult {
+    Available {
+        uri: String,
+    },
+    Limited {
+        uri: String,
+        limitations: Vec<ConversionLimitation>,
+    },
+    Unavailable {
+        reasons: Vec<ConversionLimitation>,
+    },
+}
+
+impl ShareUriResult {
+    pub fn uri(&self) -> Option<&str> {
+        match self {
+            Self::Available { uri } | Self::Limited { uri, .. } => Some(uri),
+            Self::Unavailable { .. } => None,
+        }
+    }
+
+    pub fn limitations(&self) -> &[ConversionLimitation] {
+        match self {
+            Self::Available { .. } => &[],
+            Self::Limited { limitations, .. } => limitations,
+            Self::Unavailable { reasons } => reasons,
+        }
+    }
+
+    pub fn is_available(&self) -> bool {
+        matches!(self, Self::Available { .. })
+    }
+
+    pub fn is_limited(&self) -> bool {
+        matches!(self, Self::Limited { .. })
+    }
+
+    pub fn is_unavailable(&self) -> bool {
+        matches!(self, Self::Unavailable { .. })
+    }
+}
+
 impl Transport {
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -124,14 +248,23 @@ pub struct ProxyConfig {
     pub mode: Option<String>,
 
     pub unknown_params: BTreeMap<String, Vec<String>>,
-    pub raw_uri: String,
+    pub original: OriginalRepresentation,
+    pub share_uri: ShareUriResult,
     pub metadata: ConfigMetadata,
 }
 
 impl ProxyConfig {
+    pub fn original_text(&self) -> &str {
+        self.original.text()
+    }
+
+    pub fn original_is_json(&self) -> bool {
+        self.original.is_json()
+    }
+
     pub fn semantic_key(&self) -> String {
         let canonical = format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}",
             self.protocol.as_str(),
             self.host.to_ascii_lowercase(),
             self.port,
@@ -145,8 +278,12 @@ impl ProxyConfig {
             self.fingerprint.as_deref().unwrap_or_default(),
             self.reality_public_key.as_deref().unwrap_or_default(),
             self.reality_short_id.as_deref().unwrap_or_default(),
+            self.flow.as_deref().unwrap_or_default(),
+            self.encryption.as_deref().unwrap_or_default(),
             self.path.as_deref().unwrap_or_default(),
+            self.host_header.as_deref().unwrap_or_default(),
             self.service_name.as_deref().unwrap_or_default(),
+            self.mode.as_deref().unwrap_or_default(),
             self.unknown_params,
         );
         let digest = Sha256::digest(canonical.as_bytes());

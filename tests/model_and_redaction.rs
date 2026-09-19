@@ -27,7 +27,12 @@ fn fixture_config(name: &str, host: &str, port: u16) -> ProxyConfig {
         service_name: None,
         mode: None,
         unknown_params: BTreeMap::new(),
-        raw_uri: format!("vless://{host}:{port}"),
+        original: sublens::model::OriginalRepresentation::ShareUri(format!(
+            "vless://{host}:{port}"
+        )),
+        share_uri: sublens::model::ShareUriResult::Available {
+            uri: format!("vless://{host}:{port}"),
+        },
         metadata: ConfigMetadata::default(),
     }
 }

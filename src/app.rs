@@ -7,7 +7,7 @@ use crate::{
     diagnostics::DiagnosticResult,
     history::HistoryStore,
     jobs::{JobEvent, JobHandle, JobManager},
-    model::Protocol,
+    model::{Protocol, ProxyConfig},
     resolver::AnalysisReport,
     settings::AppSettings,
     ui,
@@ -16,6 +16,12 @@ use eframe::egui;
 
 use crate::ui::main_view::{CompactPage, ConnectivityFilter, DuplicateFilter, LteFilter};
 use crate::ui::theme;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExportScope {
+    All,
+    Selected,
+}
 
 pub struct SubLensApp {
     input: String,
@@ -40,6 +46,7 @@ pub struct SubLensApp {
     history: HistoryStore,
     show_settings: bool,
     show_export: bool,
+    export_scope: ExportScope,
     qr: Option<crate::qr::QrMatrix>,
     diagnostics: HashMap<usize, DiagnosticResult>,
     copied_until: Option<Instant>,
@@ -73,6 +80,7 @@ impl SubLensApp {
             history,
             show_settings: false,
             show_export: false,
+            export_scope: ExportScope::All,
             qr: None,
             diagnostics: HashMap::new(),
             copied_until: None,
@@ -87,6 +95,7 @@ impl SubLensApp {
         }
         self.report = None;
         self.show_export = false;
+        self.export_scope = ExportScope::All;
         self.selected_config = None;
         self.protocol_filters.clear();
         self.selected_configs.clear();
@@ -208,6 +217,24 @@ impl SubLensApp {
         );
         self.diagnostic_target = Some(index);
     }
+
+    fn export_configs(&self) -> Vec<ProxyConfig> {
+        let Some(report) = &self.report else {
+            return Vec::new();
+        };
+        if self.export_scope == ExportScope::All {
+            return report.configs.clone();
+        }
+
+        let mut seen = HashSet::new();
+        report
+            .configs
+            .iter()
+            .filter(|config| self.selected_configs.contains(&config.id))
+            .filter(|config| seen.insert(config.original.identity_key()))
+            .cloned()
+            .collect()
+    }
 }
 
 impl eframe::App for SubLensApp {
@@ -246,70 +273,104 @@ impl eframe::App for SubLensApp {
         }
         if self.show_export {
             let mut close_export = false;
+            let export_configs = self.export_configs();
+            let export_summary = crate::export::share_export_summary(&export_configs);
+            let json_documents = crate::export::original_json_documents(&export_configs);
+            let has_json_payload = export_configs.iter().any(ProxyConfig::original_is_json);
+            let export_scope_label = match self.export_scope {
+                ExportScope::All => "все конфигурации",
+                ExportScope::Selected => "выбранные конфигурации",
+            };
             egui::Window::new("Экспорт конфигураций")
                 .collapsible(false)
                 .resizable(false)
                 .frame(theme::surface_frame(theme::SURFACE))
                 .show(ctx, |ui| {
-                    if let Some(report) = &self.report {
-                        let has_json_payload = report
-                            .configs
-                            .iter()
-                            .any(|config| is_json_payload(&config.raw_uri));
+                    if self.report.is_some() {
                         ui.label(
                             egui::RichText::new(format!(
-                                "Конфигураций: {} · выберите локальный экспорт",
-                                report.configs.len()
+                                "Экспорт: {export_scope_label} · конфигураций: {}",
+                                export_configs.len()
                             ))
                             .size(12.0)
                             .color(theme::MUTED),
                         );
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Доступно: {} · Ограничения: {} · Недоступно: {}",
+                                export_summary.available.len(),
+                                export_summary.limited.len(),
+                                export_summary.unavailable.len()
+                            ))
+                            .size(12.0)
+                            .color(theme::TEXT_SECONDARY),
+                        );
                         ui.add_space(10.0);
-                        if ui
-                            .add_sized(
-                                [250.0, 34.0],
-                                egui::Button::new(if has_json_payload {
-                                    "Скопировать исходные данные конфигураций"
-                                } else {
-                                    "Скопировать список URI"
-                                })
-                                .fill(theme::SURFACE_RAISED),
-                            )
-                            .clicked()
-                        {
-                            ui::details::copy_to_clipboard(&crate::export::raw_lines(
-                                &report.configs,
-                            ));
+                        let available_export = ui.add_enabled(
+                            !export_summary.available.is_empty(),
+                            egui::Button::new(format!(
+                                "Скопировать доступные URI ({})",
+                                export_summary.available.len()
+                            ))
+                            .fill(theme::ACCENT),
+                        );
+                        if available_export.clicked() {
+                            ui::details::copy_to_clipboard(
+                                &crate::export::share_uri_lines(&export_configs),
+                            );
                         }
                         let base64_export = ui.add_enabled(
-                            !has_json_payload,
-                            egui::Button::new(if has_json_payload {
-                                "Base64 недоступен для JSON"
-                            } else {
-                                "Скопировать подписку Base64"
-                            })
+                            !export_summary.available.is_empty(),
+                            egui::Button::new("Скопировать доступные URI в Base64")
                             .fill(theme::SURFACE_RAISED),
                         );
                         if base64_export.clicked() {
                             ui::details::copy_to_clipboard(&crate::export::base64_subscription(
-                                &report.configs,
+                                &export_configs,
                             ));
+                        }
+                        let limited_export = ui.add_enabled(
+                            !export_summary.limited.is_empty(),
+                            egui::Button::new(format!(
+                                "Скопировать URI с ограничениями ({})",
+                                export_summary.limited.len()
+                            ))
+                            .fill(theme::SURFACE_RAISED),
+                        );
+                        if limited_export.clicked() {
+                            ui::details::copy_to_clipboard(
+                                &crate::export::limited_share_uri_lines(&export_configs),
+                            );
+                        }
+                        let json_export = ui.add_enabled(
+                            !json_documents.is_empty(),
+                            egui::Button::new(if has_json_payload {
+                                "Скопировать исходный JSON"
+                            } else {
+                                "Исходный JSON отсутствует"
+                            })
+                            .fill(theme::SURFACE_RAISED),
+                        );
+                        if json_export.clicked() {
+                            ui::details::copy_to_clipboard(&json_documents);
                         }
                         if ui
                             .add_sized(
                                 [250.0, 34.0],
-                                egui::Button::new("Скопировать JSON").fill(theme::SURFACE_RAISED),
+                                egui::Button::new("Скопировать JSON модели")
+                                    .fill(theme::SURFACE_RAISED),
                             )
                             .clicked()
                         {
-                            if let Ok(json) = crate::export::json_dump(&report.configs, true) {
+                            if let Ok(json) = crate::export::json_dump(&export_configs, true) {
                                 ui::details::copy_to_clipboard(&json);
                             }
                         }
                         ui.add_space(8.0);
                         ui.label(
                             egui::RichText::new(
-                                "Исходный экспорт включает учётные данные только после этого действия.",
+                                "Основной экспорт содержит только доступные стандартные share URI. Ограниченные и исходные JSON выгружаются отдельными действиями.",
                             )
                             .size(11.0)
                             .color(theme::MUTED),
@@ -357,6 +418,7 @@ impl eframe::App for SubLensApp {
         }
         if result.open_export {
             self.show_export = true;
+            self.export_scope = ExportScope::All;
         }
         if result.analyze {
             self.start();
@@ -376,22 +438,12 @@ impl eframe::App for SubLensApp {
             }
         }
         if result.copy_all {
-            if let Some(report) = &self.report {
-                ui::details::copy_to_clipboard(&crate::export::raw_lines(&report.configs));
-            }
+            self.show_export = true;
+            self.export_scope = ExportScope::All;
         }
         if result.copy_selected {
-            if let Some(report) = &self.report {
-                let mut seen = HashSet::new();
-                let configs = report
-                    .configs
-                    .iter()
-                    .filter(|config| self.selected_configs.contains(&config.id))
-                    .filter(|config| seen.insert(config.raw_uri.clone()))
-                    .cloned()
-                    .collect::<Vec<_>>();
-                ui::details::copy_to_clipboard(&crate::export::raw_lines(&configs));
-            }
+            self.show_export = true;
+            self.export_scope = ExportScope::Selected;
         }
     }
 }
@@ -450,8 +502,4 @@ pub fn configure_style(ctx: &egui::Context) {
     style.spacing.menu_margin = egui::Margin::same(theme::SPACE_6);
     style.spacing.indent = 16.0;
     ctx.set_style(style);
-}
-
-fn is_json_payload(raw: &str) -> bool {
-    matches!(raw.trim_start().chars().next(), Some('{') | Some('['))
 }

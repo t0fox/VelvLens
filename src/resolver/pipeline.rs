@@ -351,6 +351,11 @@ fn process_inline(
 
     let extraction_limit = config.max_candidates.saturating_add(1);
     let extraction = super::extract::extract_items_with_limit(text, kind, extraction_limit);
+    let proxy_uris = if kind == ContentKind::JsonConfiguration {
+        Vec::new()
+    } else {
+        extraction.proxy_uris.clone()
+    };
     let json_configs = if kind == ContentKind::JsonConfiguration {
         super::xray::parse_configurations(text, source, depth)
     } else {
@@ -363,11 +368,11 @@ fn process_inline(
             StageKind::Extract,
             format!(
                 "{} proxy URIs · {} JSON configurations · {} nested URLs",
-                extraction.proxy_uris.len(),
+                proxy_uris.len(),
                 json_configs.len(),
                 extraction.nested_urls.len()
             ),
-            extraction.proxy_uris.len() + json_configs.len() + extraction.nested_urls.len(),
+            proxy_uris.len() + json_configs.len() + extraction.nested_urls.len(),
             Duration::ZERO,
         ),
     );
@@ -398,7 +403,7 @@ fn process_inline(
         report.configs.push(config_value);
         parsed_count += 1;
     }
-    for uri in extraction.proxy_uris {
+    for uri in proxy_uris {
         if cancel.is_cancelled() {
             return Err(SubLensError::Cancelled);
         }
@@ -527,7 +532,11 @@ fn process_inline(
         }
     }
 
-    let mut decode_inputs = extraction.payloads;
+    let mut decode_inputs = if kind == ContentKind::JsonConfiguration {
+        Vec::new()
+    } else {
+        extraction.payloads
+    };
     if kind == ContentKind::Base64Candidate || (!text.contains("://") && kind != ContentKind::Html)
     {
         decode_inputs.push(text.to_owned());

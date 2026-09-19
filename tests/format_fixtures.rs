@@ -97,7 +97,7 @@ fn fixture_matrix_preserves_unknown_schemes_exactly() {
     assert_eq!(extracted.proxy_uris, vec![source]);
     let config = sublens::protocols::parse_uri(source, None, 0).unwrap();
     assert_eq!(config.protocol, Protocol::Unknown);
-    assert_eq!(config.raw_uri, source);
+    assert_eq!(config.original_text(), source);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn supported_fixture_keeps_hysteria_raw_uri() {
         .unwrap();
     let config = sublens::protocols::parse_uri(hysteria_uri, None, 0).unwrap();
     assert_eq!(config.protocol, Protocol::Hysteria2);
-    assert_eq!(config.raw_uri, hysteria_uri);
+    assert_eq!(config.original_text(), hysteria_uri);
 }
 
 fn parse_fixture_lines(text: &str) -> Vec<sublens::model::ProxyConfig> {

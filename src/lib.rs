@@ -14,4 +14,5 @@ pub mod qr;
 pub mod resolver;
 pub mod security;
 pub mod settings;
+pub mod share_uri;
 pub mod ui;

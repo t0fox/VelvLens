@@ -1,0 +1,25 @@
+{
+  "remarks": "Synthetic Hysteria2 limitations",
+  "outbounds": [
+    {
+      "protocol": "hysteria",
+      "settings": {
+        "address": "hop.example.invalid",
+        "port": "443,5000-6000",
+        "version": 2
+      },
+      "streamSettings": {
+        "network": "hysteria",
+        "hysteriaSettings": {
+          "auth": "synthetic-hy2-secret",
+          "congestionControl": "bbr"
+        },
+        "tlsSettings": {
+          "serverName": "sni.example.invalid",
+          "alpn": ["h3"],
+          "fingerprint": "chrome"
+        }
+      }
+    }
+  ]
+}

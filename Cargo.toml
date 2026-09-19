@@ -19,7 +19,7 @@ regex = "1.11"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate", "zstd"] }
 scraper = "0.22"
 png = "0.18"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"

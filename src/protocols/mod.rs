@@ -11,7 +11,7 @@ use url::Url;
 
 use crate::{
     error::{Result, SubLensError},
-    model::{Protocol, ProxyConfig, Security, Transport},
+    model::{OriginalRepresentation, Protocol, ProxyConfig, Security, ShareUriResult, Transport},
 };
 
 pub fn is_supported_scheme(uri: &str) -> bool {
@@ -51,7 +51,10 @@ pub fn parse_uri(uri: &str, source: Option<&Url>, depth: u8) -> Result<ProxyConf
         "tuic" => tuic::parse(uri)?,
         _ => parse_unknown(uri, source, depth, &scheme)?,
     };
-    config.raw_uri = uri.to_owned();
+    config.original = OriginalRepresentation::ShareUri(uri.to_owned());
+    config.share_uri = ShareUriResult::Available {
+        uri: uri.to_owned(),
+    };
     config.metadata.source_url = source.map(|url| url.to_string());
     config.metadata.depth = depth;
     Ok(config)

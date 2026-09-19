@@ -14,7 +14,10 @@ pub fn deduplicate(configs: &mut [ProxyConfig]) -> DuplicateReport {
     let mut exact: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     let mut semantic: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (index, config) in configs.iter().enumerate() {
-        exact.entry(config.raw_uri.clone()).or_default().push(index);
+        exact
+            .entry(config.original.identity_key())
+            .or_default()
+            .push(index);
         semantic
             .entry(config.semantic_key())
             .or_default()

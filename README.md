@@ -8,10 +8,10 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 2. Paste a subscription or share URL.
 3. Select **Analyze**.
 4. Review the HTTP → Decode → Extract → Parse stages.
-5. Select a card to open the Inspector; on compact windows this is a separate details screen with **Back** and a pinned copy action. Ready-made JSON profiles copy their original profile JSON and do not offer QR because they are not share URIs.
+5. Select a card to open the Inspector; on compact windows this is a separate details screen with **Back** and a pinned copy action. JSON profiles are resolved into individual endpoints and expose a generated share URI when the target protocol can represent the endpoint.
 6. Select protocol categories, combine Security/Transport/Status/Duplicates filters, use the three-state LTE filter, or enter selection mode for bulk copy.
-7. Use **Test** for local DNS/TCP connectivity evidence, or **Export** for raw payload and JSON output; Base64 is available when the result is a URI subscription.
-8. Use **Copy selected** or **Copy all** when you need an explicit raw URI list. Bulk copy keeps report order, preserves original URIs, and removes duplicate lines.
+7. Use **Test** for local DNS/TCP connectivity evidence, or **Export** for separate available share URIs, explicitly limited URIs, original JSON documents, model JSON, and Base64 of available share URIs.
+8. Use **Copy selected** or **Copy all** to review counts for Available/Limited/Unavailable before copying. The primary bulk export contains only standard share URIs; original JSON is never mixed into that list.
 
 ## Supported content
 
@@ -19,7 +19,7 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 - Raw line-oriented URI lists.
 - Standard Base64 and URL-safe Base64 without padding.
 - Nested JSON strings/arrays/objects.
-- Ready-made Xray JSON profile arrays, normalized for inspection while retaining each profile's original JSON payload.
+- Xray-compatible JSON profiles, expanded into separate proxy endpoints from `outbounds`, `vnext`, and `servers` while retaining one shared original document per source.
 - HTML DOM text, links, attributes, scripts, and embedded JSON.
 - Nested subscription URLs with loop/depth/byte/count limits.
 
@@ -33,7 +33,7 @@ The layout is compact-first below 1000 logical pixels: the catalog and Inspector
 
 - No analytics, telemetry, cloud backend, or external QR service.
 - HTTP, DNS, TCP, decoding, parsing, and QR generation run locally.
-- Pipeline previews, logs, and errors redact credentials and tokens. The selected configuration view and explicit copy/export actions preserve the original URI and fields.
+- Pipeline previews, logs, and errors redact credentials and tokens. The selected configuration view and explicit copy/export actions preserve the original URI, source JSON, and usable credentials.
 - Raw response bodies are not written to disk automatically.
 - URL history is disabled by default. When enabled on Windows, it is protected with DPAPI and can be cleared.
 - DNS/TCP checks are connectivity-only; TCP success is not a claim that a VLESS/Reality protocol session works.
@@ -75,4 +75,5 @@ The live URL is never used by automated tests, and subscription contents/credent
 
 - Diagnostics currently stop at DNS and TCP connectivity; protocol-level Xray-core testing is not included.
 - Windows DPAPI history is implemented only when history is explicitly enabled.
-- Export keeps original raw URIs and unknown query keys, but does not rewrite every provider-specific URI into a new canonical format.
+- Ordinary input URIs are copied byte-for-byte from their original representation. JSON endpoints have protocol-specific serializers for VLESS, VMess, Trojan, Shadowsocks, Hysteria2, and TUIC. Unsupported or ambiguous fields are reported as Limited/Unavailable instead of being silently dropped.
+- Hysteria2 follows the official URI scheme for credentials, SNI, display name, and multi-port authority syntax. Vendor-specific TLS fingerprints and QUIC extensions remain explicitly Limited; the original JSON export is the lossless fallback.

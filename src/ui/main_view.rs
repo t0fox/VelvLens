@@ -156,19 +156,42 @@ pub fn show(
                 egui::TopBottomPanel::bottom("compact-details-actions")
                     .frame(compact_bar_frame())
                     .show(ctx, |ui| {
-                        let label = if copied_until.is_some() {
-                            "Скопировано"
-                        } else {
-                            "Скопировать конфигурацию"
+                        let (label, enabled, fill) = match &config.share_uri {
+                            crate::model::ShareUriResult::Available { .. } => (
+                                if copied_until.is_some() {
+                                    "Скопировано"
+                                } else {
+                                    "Скопировать конфигурацию"
+                                },
+                                true,
+                                theme::ACCENT,
+                            ),
+                            crate::model::ShareUriResult::Limited { .. } => {
+                                ("Скопировать ссылку с ограничениями", true, theme::WARNING)
+                            }
+                            crate::model::ShareUriResult::Unavailable { .. }
+                                if config.original_is_json() =>
+                            {
+                                ("Скопировать исходный JSON", true, theme::SURFACE_RAISED)
+                            }
+                            crate::model::ShareUriResult::Unavailable { .. } => {
+                                ("Ссылка недоступна", false, theme::SURFACE_RAISED)
+                            }
                         };
                         if ui
-                            .add_sized(
-                                [ui.available_width(), 36.0],
-                                egui::Button::new(label).fill(theme::ACCENT),
+                            .add_enabled(
+                                enabled,
+                                egui::Button::new(label)
+                                    .fill(fill)
+                                    .min_size(egui::vec2(ui.available_width(), 36.0)),
                             )
                             .clicked()
                         {
-                            details::copy_config(config, copied_until);
+                            if config.share_uri.is_unavailable() {
+                                details::copy_original(config, copied_until);
+                            } else {
+                                details::copy_config(config, copied_until);
+                            }
                         }
                     });
             }
@@ -1754,6 +1777,10 @@ mod tests {
             &HashMap::new(),
             "",
         ));
-        assert!(matches_filter(&complete.raw_uri, HashSet::new(), "-LTE"));
+        assert!(matches_filter(
+            complete.original_text(),
+            HashSet::new(),
+            "-LTE"
+        ));
     }
 }

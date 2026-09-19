@@ -9,9 +9,17 @@ use super::common::{
 };
 
 pub fn parse(uri: &str) -> Result<crate::model::ProxyConfig> {
-    let url = parse_url(uri)?;
+    let authority_port_range = authority_port_range(uri);
+    let url = match parse_url(uri) {
+        Ok(url) => url,
+        Err(_) if authority_port_range.is_some() => parse_url(&replace_authority_port(
+            uri,
+            authority_port_range.as_deref().unwrap(),
+        ))?,
+        Err(error) => return Err(error),
+    };
     let query = query_map(&url);
-    let port_spec = first_query(&query, "port");
+    let port_spec = first_query(&query, "port").or(authority_port_range);
     let (port, port_range) = match port_spec.as_deref() {
         Some(spec) => {
             let first = spec.split(',').next().unwrap_or_default();
@@ -24,6 +32,19 @@ pub fn parse(uri: &str) -> Result<crate::model::ProxyConfig> {
             (port, range.then(|| spec.to_owned()))
         }
         None => (parse_port(&url, uri)?, None),
+    };
+    let (username, password) = if let Some(password) = url.password() {
+        (
+            (!url.username().is_empty()).then(|| decode_component(url.username())),
+            Some(decode_component(password)),
+        )
+    } else {
+        (
+            None,
+            (!url.username().is_empty())
+                .then(|| decode_component(url.username()))
+                .or_else(|| first_query(&query, "auth").map(|value| decode_component(&value))),
+        )
     };
     let known = [
         "sni",
@@ -46,11 +67,8 @@ pub fn parse(uri: &str) -> Result<crate::model::ProxyConfig> {
         url.host_str().unwrap_or_default().to_owned(),
         port,
         None,
-        None,
-        url.password()
-            .map(decode_component)
-            .or_else(|| (!url.username().is_empty()).then(|| decode_component(url.username())))
-            .or_else(|| first_query(&query, "auth").map(|value| decode_component(&value))),
+        username,
+        password,
         security_from_query(&query, Security::Tls),
         Transport::Quic,
         first_query(&query, "sni"),
@@ -68,4 +86,43 @@ pub fn parse(uri: &str) -> Result<crate::model::ProxyConfig> {
     );
     config.port_range = port_range;
     Ok(config)
+}
+
+fn authority_port_range(uri: &str) -> Option<String> {
+    let (start, end) = authority_port_span(uri)?;
+    let port = &uri[start..end];
+    (port.contains(',') || port.contains('-')).then(|| port.to_owned())
+}
+
+fn replace_authority_port(uri: &str, port_range: &str) -> String {
+    let (start, end) = authority_port_span(uri).expect("authority port range was detected");
+    let first_port = port_range
+        .split([',', '-'])
+        .next()
+        .expect("port range has a first port");
+    format!("{}{}{}", &uri[..start], first_port, &uri[end..])
+}
+
+fn authority_port_span(uri: &str) -> Option<(usize, usize)> {
+    let scheme_end = uri.find("://")?.checked_add(3)?;
+    let authority_end = uri[scheme_end..]
+        .find(['/', '?', '#'])
+        .map(|offset| scheme_end + offset)
+        .unwrap_or(uri.len());
+    let authority = &uri[scheme_end..authority_end];
+    let host_start = authority
+        .rfind('@')
+        .map(|offset| scheme_end + offset + 1)
+        .unwrap_or(scheme_end);
+    let host_port = &uri[host_start..authority_end];
+    if host_port.starts_with('[') {
+        let closing_bracket = host_port.find(']')?;
+        let colon = closing_bracket + 1;
+        if host_port.as_bytes().get(colon) != Some(&b':') {
+            return None;
+        }
+        return Some((host_start + colon + 1, authority_end));
+    }
+    let colon = host_port.rfind(':')?;
+    Some((host_start + colon + 1, authority_end))
 }

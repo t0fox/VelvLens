@@ -23,7 +23,11 @@ fn redact_value(value: &mut Value) {
     match value {
         Value::Object(object) => {
             for (key, current) in object.iter_mut() {
-                if key.eq_ignore_ascii_case("raw_uri") {
+                if key.eq_ignore_ascii_case("original") {
+                    redact_original(current);
+                } else if key.eq_ignore_ascii_case("share_uri") {
+                    redact_share_uri(current);
+                } else if key.eq_ignore_ascii_case("raw_uri") {
                     if let Some(text) = current.as_str() {
                         *current = Value::String(redact_raw_payload(text));
                     }
@@ -40,6 +44,54 @@ fn redact_value(value: &mut Value) {
             }
         }
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
+fn redact_original(value: &mut Value) {
+    let Value::Object(object) = value else {
+        return;
+    };
+    for (variant, payload) in object.iter_mut() {
+        if variant.eq_ignore_ascii_case("ShareUri") {
+            if let Some(text) = payload.as_str() {
+                *payload = Value::String(redact_uri(text));
+            }
+        } else if variant.eq_ignore_ascii_case("JsonProfile") {
+            redact_json_document(payload);
+        }
+    }
+}
+
+fn redact_share_uri(value: &mut Value) {
+    let Value::Object(object) = value else {
+        return;
+    };
+    for (key, payload) in object.iter_mut() {
+        if key.eq_ignore_ascii_case("uri") {
+            if let Some(text) = payload.as_str() {
+                *payload = Value::String(redact_uri(text));
+            }
+        } else {
+            redact_share_uri(payload);
+        }
+    }
+}
+
+fn redact_json_document(value: &mut Value) {
+    let Value::Object(object) = value else {
+        return;
+    };
+    for (key, payload) in object.iter_mut() {
+        if key.eq_ignore_ascii_case("document") {
+            if let Some(text) = payload.as_str() {
+                if let Ok(mut document) = serde_json::from_str::<Value>(text) {
+                    redact_json_payload(&mut document);
+                    if let Ok(redacted) = serde_json::to_string(&document) {
+                        *payload = Value::String(redacted);
+                    }
+                }
+            }
+        }
     }
 }
 

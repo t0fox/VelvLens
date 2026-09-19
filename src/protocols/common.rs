@@ -5,7 +5,7 @@ use url::Url;
 
 use crate::{
     error::{Result, SubLensError},
-    model::{ProxyConfig, Security, Transport},
+    model::{OriginalRepresentation, ProxyConfig, Security, ShareUriResult, Transport},
 };
 
 pub fn parse_url(uri: &str) -> Result<Url> {
@@ -145,7 +145,10 @@ pub fn finish(
         service_name,
         mode,
         unknown_params,
-        raw_uri: raw_uri.to_owned(),
+        original: OriginalRepresentation::ShareUri(raw_uri.to_owned()),
+        share_uri: ShareUriResult::Available {
+            uri: raw_uri.to_owned(),
+        },
         metadata: Default::default(),
     }
 }

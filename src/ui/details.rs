@@ -17,7 +17,7 @@ pub fn show(
     copied_until: &mut Option<Instant>,
     compact: bool,
 ) -> bool {
-    let json_payload = is_json_payload(config);
+    let json_payload = config.original_is_json();
     if copied_until.is_some_and(|until| until <= Instant::now()) {
         *copied_until = None;
     }
@@ -66,32 +66,20 @@ pub fn show(
                 theme::badge(ui, flow, theme::SURFACE_RAISED, theme::TEXT_SECONDARY);
             }
             if !compact {
-                let copied = copied_until.is_some();
-                if ui
-                    .add_sized(
-                        [178.0, 34.0],
-                        egui::Button::new(if copied {
-                            "Скопировано"
-                        } else {
-                            "Скопировать конфигурацию"
-                        })
-                        .fill(theme::ACCENT),
-                    )
-                    .clicked()
-                {
-                    copy_config(config, copied_until);
-                }
+                show_share_copy_actions(ui, config, copied_until);
                 let qr_response = ui.add_enabled(
-                    !json_payload,
-                    egui::Button::new(if json_payload {
-                        "QR недоступен"
-                    } else {
-                        "QR"
+                    config.share_uri.uri().is_some(),
+                    egui::Button::new(match &config.share_uri {
+                        crate::model::ShareUriResult::Available { .. } => "QR",
+                        crate::model::ShareUriResult::Limited { .. } => "QR с ограничениями",
+                        crate::model::ShareUriResult::Unavailable { .. } => "QR недоступен",
                     })
                     .fill(theme::SURFACE_RAISED),
                 );
                 if qr_response.clicked() {
-                    *qr = Some(crate::qr::encode(&config.raw_uri));
+                    if let Some(uri) = config.share_uri.uri() {
+                        *qr = Some(crate::qr::encode(uri));
+                    }
                 }
                 ui.menu_button("Ещё", |ui| {
                     if ui.button("Проверить соединение").clicked() {
@@ -103,16 +91,27 @@ pub fn show(
                 ui.menu_button("Действия", |ui| {
                     if ui
                         .add_enabled(
-                            !json_payload,
-                            egui::Button::new(if json_payload {
-                                "QR недоступен"
-                            } else {
-                                "QR-код"
+                            config.share_uri.uri().is_some(),
+                            egui::Button::new(match &config.share_uri {
+                                crate::model::ShareUriResult::Available { .. } => "QR-код",
+                                crate::model::ShareUriResult::Limited { .. } => {
+                                    "QR с ограничениями"
+                                }
+                                crate::model::ShareUriResult::Unavailable { .. } => "QR недоступен",
                             }),
                         )
                         .clicked()
                     {
-                        *qr = Some(crate::qr::encode(&config.raw_uri));
+                        if let Some(uri) = config.share_uri.uri() {
+                            *qr = Some(crate::qr::encode(uri));
+                        }
+                        ui.close_menu();
+                    }
+                    if config.original_is_json()
+                        && config.share_uri.is_unavailable()
+                        && ui.button("Скопировать исходный JSON").clicked()
+                    {
+                        copy_original(config, copied_until);
                         ui.close_menu();
                     }
                     if ui.button("Проверить соединение").clicked() {
@@ -137,7 +136,7 @@ pub fn show(
             .show(ui, |ui| {
                 ui.label(
                     egui::RichText::new(if json_payload {
-                        "Конфигурация JSON"
+                        "Исходный JSON"
                     } else {
                         "URI конфигурации"
                     })
@@ -145,13 +144,13 @@ pub fn show(
                     .strong()
                     .color(theme::TEXT_MUTED),
                 );
-                let mut raw_uri = config.raw_uri.clone();
+                let mut raw_uri = config.original_text().to_owned();
                 ui.add(
                     egui::TextEdit::singleline(&mut raw_uri)
                         .desired_width(f32::INFINITY)
                         .interactive(false),
                 )
-                .on_hover_text(&config.raw_uri);
+                .on_hover_text(config.original_text());
             });
         if let Some(result) = diagnostic {
             ui.add_space(8.0);
@@ -298,15 +297,69 @@ fn display_port(config: &ProxyConfig) -> String {
 }
 
 pub fn copy_config(config: &ProxyConfig, copied_until: &mut Option<Instant>) {
-    copy_to_clipboard(&config.raw_uri);
+    if let Some(uri) = config.share_uri.uri() {
+        copy_to_clipboard(uri);
+        *copied_until = Some(Instant::now() + Duration::from_secs(2));
+    }
+}
+
+pub fn copy_original(config: &ProxyConfig, copied_until: &mut Option<Instant>) {
+    copy_to_clipboard(config.original_text());
     *copied_until = Some(Instant::now() + Duration::from_secs(2));
 }
 
-fn is_json_payload(config: &ProxyConfig) -> bool {
-    matches!(
-        config.raw_uri.trim_start().chars().next(),
-        Some('{') | Some('[')
-    )
+fn show_share_copy_actions(
+    ui: &mut egui::Ui,
+    config: &ProxyConfig,
+    copied_until: &mut Option<Instant>,
+) {
+    let copied = copied_until.is_some();
+    match &config.share_uri {
+        crate::model::ShareUriResult::Available { .. } => {
+            if ui
+                .add_sized(
+                    [178.0, 34.0],
+                    egui::Button::new(if copied {
+                        "Скопировано"
+                    } else {
+                        "Скопировать конфигурацию"
+                    })
+                    .fill(theme::ACCENT),
+                )
+                .clicked()
+            {
+                copy_config(config, copied_until);
+            }
+        }
+        crate::model::ShareUriResult::Limited { .. } => {
+            ui.add_enabled(false, egui::Button::new("Есть ограничения"));
+            if ui.button("Скопировать с ограничениями").clicked() {
+                copy_config(config, copied_until);
+            }
+        }
+        crate::model::ShareUriResult::Unavailable { .. } => {
+            ui.add_enabled(false, egui::Button::new("Ссылка недоступна"));
+            if config.original_is_json() && ui.button("Скопировать исходный JSON").clicked()
+            {
+                copy_original(config, copied_until);
+            }
+        }
+    }
+    if !config.share_uri.limitations().is_empty() {
+        ui.label(
+            egui::RichText::new(
+                config
+                    .share_uri
+                    .limitations()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+            )
+            .size(10.0)
+            .color(theme::WARNING),
+        );
+    }
 }
 
 fn status_badge(ui: &mut egui::Ui, label: &str, status: &crate::diagnostics::CheckStatus) {
