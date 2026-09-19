@@ -411,3 +411,96 @@ fn compact_main_view_catalog_accepts_mouse_wheel() {
         "compact catalog should move by a visible amount on mouse wheel: before={before}, after={after}"
     );
 }
+
+#[test]
+fn compact_catalog_wheel_over_search_controls_moves_the_list() {
+    let context = egui::Context::default();
+    configure_style(&context);
+    let mut configs = Vec::new();
+    for row in 0..24 {
+        let mut config = parse_uri(
+            &format!(
+                "vless://12345678-1234-1234-1234-123456789abc@example{row}.test:443#Example-{row}"
+            ),
+            None,
+            row,
+        )
+        .unwrap();
+        config.id = format!("control-wheel-fixture-{row}");
+        configs.push(config);
+    }
+    let report = AnalysisReport {
+        configs,
+        ..AnalysisReport::default()
+    };
+    let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(820.0, 640.0));
+    // This point is over the compact search/filter row, above the virtualized
+    // card list. The whole catalog column must still route the wheel there.
+    let pointer = egui::pos2(240.0, 178.0);
+
+    let render = |events: Vec<egui::Event>| {
+        let mut selected = Some("control-wheel-fixture-0".to_owned());
+        let mut protocol_filters = HashSet::new();
+        let mut selected_configs = HashSet::new();
+        let mut search = String::new();
+        let mut security_filter = None;
+        let mut transport_filter = None;
+        let mut connectivity_filter = ConnectivityFilter::All;
+        let mut duplicate_filter = DuplicateFilter::All;
+        let mut lte_filter = LteFilter::All;
+        let mut selection_mode = false;
+        let mut compact_page = CompactPage::ConfigList;
+        let mut qr = None;
+        let diagnostics = HashMap::new();
+        let mut copied_until = None;
+        let mut scroll_offset = None;
+        let _ = context.run(
+            egui::RawInput {
+                screen_rect: Some(viewport),
+                events,
+                ..Default::default()
+            },
+            |ctx| {
+                let result = main_view::show(
+                    ctx,
+                    &mut String::new(),
+                    &[],
+                    Some(&report),
+                    &mut selected,
+                    &mut protocol_filters,
+                    &mut selected_configs,
+                    &mut search,
+                    &mut security_filter,
+                    &mut transport_filter,
+                    &mut connectivity_filter,
+                    &mut duplicate_filter,
+                    &mut lte_filter,
+                    &mut selection_mode,
+                    &mut compact_page,
+                    false,
+                    "Fixture loaded",
+                    &mut qr,
+                    &diagnostics,
+                    &mut copied_until,
+                );
+                scroll_offset = result.catalog_scroll_offset;
+            },
+        );
+        scroll_offset.expect("compact catalog scroll state should be reported")
+    };
+
+    let before = render(vec![egui::Event::PointerMoved(pointer)]);
+    let after = render(vec![
+        egui::Event::PointerMoved(pointer),
+        egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, -3.0),
+            modifiers: egui::Modifiers::default(),
+        },
+    ]);
+
+    assert!(
+        after > before,
+        "wheel over compact catalog controls should move the list: before={before}, after={after}"
+    );
+}
