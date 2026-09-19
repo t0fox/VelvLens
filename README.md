@@ -8,10 +8,10 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 2. Paste a subscription or share URL.
 3. Select **Analyze**.
 4. Review the HTTP → Decode → Extract → Parse stages.
-5. Select a card to open the Inspector; use the visible **Copy configuration**, **Copy**, or **QR** actions. Ready-made JSON profiles copy their original profile JSON and do not offer QR because they are not share URIs.
-6. Select protocol categories, combine Security/Transport/Status/Duplicates filters, use **Select visible**, or check individual cards.
+5. Select a card to open the Inspector; on compact windows this is a separate details screen with **Back** and a pinned copy action. Ready-made JSON profiles copy their original profile JSON and do not offer QR because they are not share URIs.
+6. Select protocol categories, combine Security/Transport/Status/Duplicates filters, use the three-state LTE filter, or enter selection mode for bulk copy.
 7. Use **Test** for local DNS/TCP connectivity evidence, or **Export** for raw payload and JSON output; Base64 is available when the result is a URI subscription.
-8. Use **Copy selected** or **Copy all configs** when you need an explicit raw URI list.
+8. Use **Copy selected** or **Copy all** when you need an explicit raw URI list. Bulk copy keeps report order, preserves original URIs, and removes duplicate lines.
 
 ## Supported content
 
@@ -25,7 +25,9 @@ SubLens is a local Windows visual inspector for proxy subscription and share URL
 
 Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Socks5, Hysteria/Hysteria2/Hy2, and TUIC. Unknown URI schemes are preserved as inspectable **Unknown** configurations instead of being silently discarded.
 
-The catalog supports multiple protocol filters at once. The name/host search accepts exclusion terms such as `-LTE` or `-Torrent`, so unwanted categories can be left out before using **Select visible**.
+The catalog supports multiple protocol filters at once. The name/host search accepts exclusion terms such as `-LTE` or `-Torrent`, so unwanted categories can be left out before using selection mode. LTE detection is token-boundary aware and only examines the display name, so names such as `COMPLETE` and `DELETE` are not falsely excluded.
+
+The layout is compact-first below 1000 logical pixels: the catalog and Inspector become separate scrollable screens. Wide windows keep the catalog and Inspector side by side. Repaints follow the active Windows monitor refresh rate, with a bounded 60 Hz fallback when the rate cannot be read.
 
 ## Privacy and safety
 
