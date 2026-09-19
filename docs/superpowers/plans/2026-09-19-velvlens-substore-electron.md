@@ -104,7 +104,7 @@ Interfaces:
 
 - [ ] Step 2: Implement scripts/fetch-node-runtime.mjs.
 
-    Download https://nodejs.org/dist/v24.15.0/win-x64/node.exe, verify SHA-256 3331e1ffe19874215472217c5e94f5a0c8f42e8c4ac7111d3937aa0ad5e9b4a5, then rename the verified temporary file to .build/runtime/node.exe. Reject non-2xx responses and never print response bodies.
+    Download https://nodejs.org/dist/v24.15.0/win-x64/node.exe, verify SHA-256 3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5, then rename the verified temporary file to .build/runtime/node.exe. Reject non-2xx responses and never print response bodies.
 
 - [ ] Step 3: Add package metadata and builder constraints.
 
@@ -130,7 +130,7 @@ Interfaces:
         pnpm build:runtime
         Get-FileHash .build/runtime/node.exe -Algorithm SHA256
 
-    Expected: tests pass and the printed hash equals 3331e1ffe19874215472217c5e94f5a0c8f42e8c4ac7111d3937aa0ad5e9b4a5.
+    Expected: tests pass and the printed hash equals 3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5.
 
 - [ ] Step 6: Commit.
 
@@ -411,4 +411,3 @@ Files:
 - [ ] Step 4: Run finishing-a-development-branch.
 
     Inspect the final diff, keep separate test and visual-approval boundaries, and report exact branch/commit/artifacts plus any remaining human visual review gate.
-

@@ -1,0 +1,24 @@
+{
+  "name": "velvlens",
+  "version": "0.2.0",
+  "description": "VelvLens desktop shell for a local Sub-Store resolver",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.mjs",
+  "packageManager": "pnpm@11.0.9",
+  "scripts": {
+    "start": "electron .",
+    "build:substore": "node scripts/build-substore.mjs",
+    "build:runtime": "node scripts/fetch-node-runtime.mjs",
+    "test:electron": "node --test tests/electron/*.test.mjs",
+    "smoke:substore": "node scripts/smoke-substore.mjs",
+    "dist": "pnpm build:substore && pnpm build:runtime && electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "electron": "44.4.3"
+  },
+  "devDependencies": {
+    "electron-builder": "26.15.3"
+  }
+}

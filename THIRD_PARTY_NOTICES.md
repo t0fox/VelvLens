@@ -36,7 +36,7 @@ The distributed frontend is the upstream Vite build generated with:
 ## Node.js runtime
 
 - Runtime: official Node.js `v24.15.0` Windows x64 `node.exe`
-- Direct executable SHA-256: `3331e1ffe19874215472217c5e94f5a0c8f42e8c4ac7111d3937aa0ad5e9b4a5`
+- Direct executable SHA-256: `3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5`
 - License and third-party notices: `LICENSES/NODE-24.15.0.txt`
 - Source: https://github.com/nodejs/node/tree/v24.15.0
 - Official distribution: https://nodejs.org/dist/v24.15.0/

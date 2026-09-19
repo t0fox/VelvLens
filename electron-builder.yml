@@ -1,0 +1,43 @@
+appId: org.velvlens.desktop
+productName: VelvLens
+asar: true
+directories:
+  output: release
+  buildResources: assets
+files:
+  - electron/**/*
+  - package.json
+  - THIRD_PARTY_NOTICES.md
+  - LICENSES/**/*
+  - '!third_party/**/*'
+  - '!tests/**/*'
+  - '!scripts/**/*'
+  - '!src/**/*'
+  - '!target/**/*'
+  - '!Cargo.*'
+extraResources:
+  - from: .build/substore
+    to: substore
+    filter:
+      - '**/*'
+  - from: .build/runtime
+    to: runtime
+    filter:
+      - node.exe
+  - from: LICENSES
+    to: licenses
+    filter:
+      - '**/*'
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+win:
+  icon: assets/icon.svg
+  target:
+    - nsis
+    - portable
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+portable:
+  artifactName: VelvLens-portable.${ext}
