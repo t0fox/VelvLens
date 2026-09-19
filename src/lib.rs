@@ -3,6 +3,7 @@ pub mod dedup;
 pub mod diagnostics;
 pub mod error;
 pub mod export;
+pub mod frame_pacing;
 pub mod history;
 pub mod jobs;
 pub mod live;

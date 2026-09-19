@@ -104,10 +104,12 @@ impl SubLensApp {
         self.job = Some(self.job_manager.start_analysis(url, resolver));
     }
 
-    fn poll_job(&mut self, ctx: &egui::Context) {
-        let Some(job) = &self.job else { return };
+    fn poll_job(&mut self) -> bool {
+        let Some(job) = &self.job else { return false };
         let mut finished = false;
+        let mut changed = false;
         while let Ok(event) = job.receiver.try_recv() {
+            changed = true;
             match event {
                 JobEvent::Started => self.status = "Fetching source…".to_owned(),
                 JobEvent::Stage(stage) => {
@@ -136,15 +138,17 @@ impl SubLensApp {
         if finished {
             self.job = None;
         }
-        ctx.request_repaint_after(Duration::from_millis(50));
+        changed
     }
 
-    fn poll_diagnostic_job(&mut self, ctx: &egui::Context) {
+    fn poll_diagnostic_job(&mut self) -> bool {
         let Some(job) = &self.diagnostic_job else {
-            return;
+            return false;
         };
         let mut finished = false;
+        let mut changed = false;
         while let Ok(event) = job.receiver.try_recv() {
+            changed = true;
             match event {
                 JobEvent::DiagnosticCompleted(result) => {
                     if let Some(index) = self.diagnostic_target {
@@ -168,7 +172,7 @@ impl SubLensApp {
             self.diagnostic_job = None;
             self.diagnostic_target = None;
         }
-        ctx.request_repaint_after(Duration::from_millis(50));
+        changed
     }
 
     fn start_diagnostic(&mut self, index: usize) {
@@ -193,9 +197,15 @@ impl SubLensApp {
 }
 
 impl eframe::App for SubLensApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.poll_job(ctx);
-        self.poll_diagnostic_job(ctx);
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        let job_changed = self.poll_job();
+        let diagnostic_changed = self.poll_diagnostic_job();
+        if job_changed || diagnostic_changed {
+            ctx.request_repaint();
+        }
+        if self.job.is_some() || self.diagnostic_job.is_some() {
+            ctx.request_repaint_after(crate::frame_pacing::repaint_interval_for_frame(frame));
+        }
         let running = self.job.is_some();
         if self.show_settings {
             egui::Window::new("Settings")

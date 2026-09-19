@@ -1,3 +1,5 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
+
 fn main() -> eframe::Result {
     tracing_subscriber::fmt()
         .with_env_filter("sublens=info")
