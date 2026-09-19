@@ -1,5 +1,7 @@
 /target/
-/artifacts/
+/artifacts/*
+!/artifacts/velvlens-substore/
+!/artifacts/velvlens-substore/**
 .build/
 release/
 node_modules/

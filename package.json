@@ -13,6 +13,7 @@
     "build:runtime": "node scripts/fetch-node-runtime.mjs",
     "test:electron": "node --test tests/electron/*.test.mjs",
     "smoke:substore": "node scripts/smoke-substore.mjs",
+    "smoke:electron": "node scripts/smoke-electron.mjs",
     "dist": "pnpm build:substore && pnpm build:runtime && electron-builder --win nsis portable"
   },
   "dependencies": {

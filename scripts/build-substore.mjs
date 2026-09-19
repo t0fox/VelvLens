@@ -57,6 +57,7 @@ export async function validateStaging(stageRoot) {
   const required = [
     join(stageRoot, 'backend', 'sub-store.bundle.js'),
     join(stageRoot, 'backend', 'runtime-manifest.json'),
+    join(stageRoot, 'backend', 'package.json'),
     join(stageRoot, 'frontend', 'index.html'),
     join(stageRoot, 'manifest.json'),
   ];
@@ -99,6 +100,7 @@ export async function buildSubStore({
   await mkdir(join(stageRoot, 'backend'), { recursive: true });
   await cp(join(backendRoot, 'dist', 'sub-store.bundle.js'), join(stageRoot, 'backend', 'sub-store.bundle.js'));
   await cp(join(backendRoot, 'dist', 'runtime-manifest.json'), join(stageRoot, 'backend', 'runtime-manifest.json'));
+  await writeFile(join(stageRoot, 'backend', 'package.json'), '{"type":"commonjs"}\n', 'utf8');
   await cp(join(frontendRoot, 'dist'), join(stageRoot, 'frontend'), { recursive: true });
 
   const backendPackage = JSON.parse(await readFile(join(backendRoot, 'package.json'), 'utf8'));

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -24,6 +27,7 @@ function fakeChild() {
 
 test('parseReadyPort accepts only a valid loopback readiness line', () => {
   assert.equal(parseReadyPort('[BACKEND] listening on 127.0.0.1:43210'), 43210);
+  assert.equal(parseReadyPort('[sub-store] INFO: [BACKEND] listening on 127.0.0.1:43210'), 43210);
   assert.equal(parseReadyPort('[BACKEND] listening on 0.0.0.0:43210'), null);
   assert.equal(parseReadyPort('[BACKEND] listening on 127.0.0.1:0'), null);
   assert.equal(parseReadyPort('backend output with 127.0.0.1:43210'), null);
@@ -39,12 +43,13 @@ test('classifyStartupFailure returns safe categories', () => {
 
 test('startBackend resolves loopback origin and enforces the environment contract', async () => {
   const child = fakeChild();
+  const dataRoot = await mkdtemp(join(tmpdir(), 'velvlens-backend-test-'));
   let invocation;
   const resultPromise = startBackend({
     nodeBinary: 'C:/VelvLens/runtime/node.exe',
     backendEntry: 'C:/VelvLens/substore/backend/sub-store.bundle.js',
     frontendRoot: 'C:/VelvLens/substore/frontend',
-    dataRoot: 'C:/Users/test/AppData/Roaming/VelvLens/sub-store-data',
+    dataRoot,
     timeoutMs: 1000,
     spawnProcess: (binary, args, options) => {
       invocation = { binary, args, options };
@@ -65,8 +70,9 @@ test('startBackend resolves loopback origin and enforces the environment contrac
   assert.equal(invocation.options.env.SUB_STORE_BACKEND_MERGE, 'true');
   assert.equal(invocation.options.env.SUB_STORE_FRONTEND_BACKEND_PATH, '/velvlens-api');
   assert.equal(invocation.options.env.SUB_STORE_FRONTEND_PATH, 'C:/VelvLens/substore/frontend');
-  assert.equal(invocation.options.env.SUB_STORE_DATA_BASE_PATH, 'C:/Users/test/AppData/Roaming/VelvLens/sub-store-data');
+  assert.equal(invocation.options.env.SUB_STORE_DATA_BASE_PATH, dataRoot);
   await stopBackend(result.child);
+  await rm(dataRoot, { recursive: true, force: true });
 });
 
 test('startBackend reports timeout and pre-ready exit without child output', async () => {

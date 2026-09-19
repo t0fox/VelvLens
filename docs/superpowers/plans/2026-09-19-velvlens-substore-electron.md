@@ -167,7 +167,7 @@ Interfaces:
         pnpm install --frozen-lockfile
         pnpm build
 
-    Copy only backend dist/sub-store.bundle.js, backend runtime-manifest.json, and all frontend dist files into .build/substore. Refuse to build before pin checks pass.
+    Copy only backend dist/sub-store.bundle.js, backend runtime-manifest.json, and all frontend dist files into .build/substore. Add a generated backend/package.json with {"type":"commonjs"} so the upstream CJS bundle is not reinterpreted by the root ESM package. Refuse to build before pin checks pass.
 
 - [ ] Step 3: Write .build/substore/manifest.json.
 
@@ -215,7 +215,7 @@ Interfaces:
 
 - [ ] Step 2: Implement bounded readiness.
 
-    Spawn bundled node.exe with windowsHide true, keep output in memory only, parse stdout/stderr for the readiness line, apply a 30-second timeout, and reject on spawn error, pre-ready exit, invalid port, or timeout.
+    Create dataRoot before spawn, then spawn bundled node.exe with windowsHide true, keep output in memory only, parse stdout/stderr for the readiness line, apply a 30-second timeout, and reject on spawn error, pre-ready exit, invalid port, or timeout.
 
 - [ ] Step 3: Implement clean shutdown.
 

@@ -47,6 +47,7 @@ The two official repositories are added as submodules under `third_party/`. The 
 The generated runtime contains:
 
 - `substore/backend/sub-store.bundle.js`;
+- `substore/backend/package.json` with `{"type":"commonjs"}` so the original CJS bundle remains CJS inside the root ESM app;
 - `substore/frontend/` with the original Vite output;
 - `runtime/node.exe`, downloaded from the official Node `v24.15.0` Windows x64 distribution and verified against the direct executable SHA-256 `3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5`.
 
@@ -54,7 +55,7 @@ Build-time `pnpm` and Node are required only on the developer/CI machine. The in
 
 ### Backend lifecycle
 
-Electron creates `%APPDATA%/VelvLens/sub-store-data` through `app.getPath('userData')`, starts the bundled `node.exe` with:
+Electron creates `%APPDATA%/VelvLens/sub-store-data` through `app.getPath('userData')` before spawning the backend, then starts the bundled `node.exe` with:
 
 ```text
 SUB_STORE_BACKEND_API_HOST=127.0.0.1

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export const BACKEND_PATH = '/velvlens-api';
@@ -6,7 +7,7 @@ const DEFAULT_START_TIMEOUT_MS = 30_000;
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
 
 export function parseReadyPort(line) {
-  const match = /^\[BACKEND\]\s+listening\s+on\s+127\.0\.0\.1:(\d{1,5})\s*$/u.exec(String(line).trim());
+  const match = /(?:^|\s)\[BACKEND\]\s+listening\s+on\s+127\.0\.0\.1:(\d{1,5})\s*$/u.exec(String(line).trim());
   if (!match) return null;
   const port = Number(match[1]);
   return port >= 1 && port <= 65_535 ? port : null;
@@ -31,7 +32,7 @@ function safeError(failure) {
   return error;
 }
 
-export function startBackend({
+export async function startBackend({
   nodeBinary,
   backendEntry,
   frontendRoot,
@@ -39,6 +40,12 @@ export function startBackend({
   timeoutMs = DEFAULT_START_TIMEOUT_MS,
   spawnProcess = spawn,
 } = {}) {
+  try {
+    await mkdir(dataRoot, { recursive: true });
+  } catch {
+    return Promise.reject(safeError(classifyStartupFailure({ reason: 'spawn' })));
+  }
+
   const environment = {
     ...process.env,
     SUB_STORE_BACKEND_API_HOST: '127.0.0.1',

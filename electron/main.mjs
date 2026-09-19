@@ -17,6 +17,7 @@ const ERROR_PAGE = join(__dirname, 'backend-error.html');
 let mainWindow;
 let backendRuntime;
 let isQuitting = false;
+let lastFailureCode;
 
 export function resolveRuntimePaths({ packaged = app.isPackaged, resourcesPath = process.resourcesPath, projectRoot = resolve(__dirname, '..') } = {}) {
   const root = packaged ? resourcesPath : join(projectRoot, '.build');
@@ -125,8 +126,10 @@ export async function createMainWindow() {
 
   try {
     await loadSubStore(mainWindow);
+    lastFailureCode = undefined;
   } catch (error) {
     const failure = safeFailure(error);
+    lastFailureCode = failure.code;
     await showBackendError(mainWindow, failure);
   }
   return mainWindow;
@@ -152,6 +155,10 @@ async function shutdown() {
   await stopBackend(child);
 }
 
+function emitSmokeMarker(message) {
+  if (process.env.VELVLENS_SMOKE === '1') process.stdout.write(`[VELVLENS_SMOKE] ${message}\n`);
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -161,6 +168,12 @@ if (!gotLock) {
     configureHeaders();
     ipcMain.handle('backend:retry', retryBackend);
     await createMainWindow();
+    if (backendRuntime) {
+      emitSmokeMarker(`READY title=${WINDOW_TITLE} backend=loopback child=${backendRuntime.child.pid ?? 0}`);
+    } else {
+      emitSmokeMarker(`ERROR code=${lastFailureCode ?? 'BACKEND_START_FAILED'}`);
+    }
+    if (process.env.VELVLENS_SMOKE_EXIT === '1') setTimeout(() => app.quit(), 400);
     app.on('activate', () => void createMainWindow());
   });
   app.on('before-quit', (event) => {

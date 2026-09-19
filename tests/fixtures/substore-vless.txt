@@ -1,0 +1,1 @@
+vless://00000000-0000-0000-0000-000000000001@example.com:443?security=tls&type=ws&path=%2Fws&host=cdn.example.com&sni=cdn.example.com#Fixture

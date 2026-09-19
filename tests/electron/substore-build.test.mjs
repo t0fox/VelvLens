@@ -31,6 +31,7 @@ test('validateStaging requires generated files and rejects node_modules', async 
   await mkdir(join(root, 'frontend', 'assets'), { recursive: true });
   await writeFile(join(root, 'backend', 'sub-store.bundle.js'), 'bundle');
   await writeFile(join(root, 'backend', 'runtime-manifest.json'), '{}');
+  await writeFile(join(root, 'backend', 'package.json'), '{"type":"commonjs"}');
   await writeFile(join(root, 'frontend', 'index.html'), '<!doctype html>');
   await writeFile(join(root, 'frontend', 'assets', 'app.js'), 'chunk');
   await writeFile(join(root, 'manifest.json'), '{}');
