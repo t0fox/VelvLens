@@ -498,9 +498,14 @@ fn compact_catalog_wheel_over_search_controls_moves_the_list() {
             modifiers: egui::Modifiers::default(),
         },
     ]);
+    let settled = render(vec![egui::Event::PointerMoved(pointer)]);
 
     assert!(
         after > before,
         "wheel over compact catalog controls should move the list: before={before}, after={after}"
+    );
+    assert!(
+        settled >= after,
+        "catalog offset must persist after the wheel frame: after={after}, settled={settled}"
     );
 }

@@ -177,6 +177,7 @@ fn parse_endpoint(
     let stream = outbound.get("streamSettings").unwrap_or(&Value::Null);
     let user = candidate.user.unwrap_or(&Value::Null);
     let name = display_name(profile, candidate.endpoint, endpoint_index, total);
+    let labels = collect_labels(profile, outbound, candidate.endpoint, candidate.user);
     let uuid = first_string(user, &["id", "uuid"])
         .or_else(|| first_string(candidate.endpoint, &["id", "uuid"]));
     let username = first_string(user, &["user", "username"])
@@ -264,6 +265,7 @@ fn parse_endpoint(
         metadata: ConfigMetadata {
             source_url: Some(source.to_string()),
             depth,
+            labels,
             ..ConfigMetadata::default()
         },
     };
@@ -326,6 +328,25 @@ fn display_name(
             name
         }
     })
+}
+
+fn collect_labels(
+    profile: &Value,
+    outbound: &Value,
+    endpoint: &Value,
+    user: Option<&Value>,
+) -> Vec<String> {
+    let mut labels = Vec::new();
+    for value in [Some(profile), Some(outbound), Some(endpoint), user] {
+        for key in ["remarks", "name", "tag"] {
+            if let Some(label) = value.and_then(|value| first_string(value, &[key])) {
+                if !label.is_empty() && !labels.contains(&label) {
+                    labels.push(label);
+                }
+            }
+        }
+    }
+    labels
 }
 
 fn security_from(stream: &Value, protocol: Protocol) -> Security {

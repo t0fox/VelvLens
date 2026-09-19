@@ -215,6 +215,11 @@ pub struct ConfigMetadata {
     pub depth: u8,
     pub exact_duplicate_count: usize,
     pub semantic_duplicate_group: Option<usize>,
+    /// Labels found around the endpoint in source formats such as Xray JSON.
+    /// They are kept separately from the display name so filters can match
+    /// transport/source tags that are not chosen as the visible title.
+    #[serde(default)]
+    pub labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

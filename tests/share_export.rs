@@ -43,3 +43,21 @@ fn original_json_export_is_separate_and_deduplicated_by_source_document() {
     assert_eq!(documents.matches("HY2-Torrent").count(), 1);
     assert_eq!(documents.matches("NL-SMART").count(), 1);
 }
+
+#[test]
+fn share_export_deduplicates_semantically_identical_configs() {
+    let uri = "vless://12345678-1234-1234-1234-123456789abc@example.test:443#Avito";
+    let first = parse_uri(uri, None, 0).unwrap();
+    let second = parse_uri(uri, None, 1).unwrap();
+
+    let summary = share_export_summary(&[first, second]);
+
+    assert_eq!(summary.available, vec![uri]);
+    assert_eq!(
+        share_uri_lines(&[
+            parse_uri(uri, None, 0).unwrap(),
+            parse_uri(uri, None, 1).unwrap(),
+        ]),
+        format!("{uri}\n")
+    );
+}

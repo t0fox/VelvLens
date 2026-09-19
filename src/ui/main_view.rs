@@ -1002,7 +1002,11 @@ fn draw_catalog(
     } else {
         "wide-config-list"
     };
-    let wheel_target = catalog_wheel_target(ui, catalog_scroll_salt);
+    let list_rect = egui::Rect::from_min_size(
+        egui::pos2(ui.max_rect().left(), ui.cursor().min.y),
+        egui::vec2(ui.available_width(), list_height),
+    );
+    let wheel_target = catalog_wheel_target(ui, catalog_scroll_salt, Some(list_rect));
     let mut catalog_scroll = egui::ScrollArea::vertical()
         .id_salt(catalog_scroll_salt)
         .max_height(list_height)
@@ -1054,32 +1058,42 @@ fn draw_catalog(
 /// Keep the catalog wheel target larger than the list itself. The filters and
 /// search field are part of the same visual column, so scrolling over them
 /// should continue moving the configuration list instead of doing nothing.
-fn catalog_wheel_target(ui: &mut egui::Ui, scroll_salt: &str) -> Option<f32> {
+fn catalog_wheel_target(
+    ui: &mut egui::Ui,
+    scroll_salt: &str,
+    list_rect: Option<egui::Rect>,
+) -> Option<f32> {
     let catalog_rect = ui.max_rect();
-    let pointer_outside_catalog = ui
-        .input(|input| input.pointer.hover_pos())
-        .is_some_and(|position| !catalog_rect.contains(position));
-    if pointer_outside_catalog {
+    let pointer = ui.input(|input| input.pointer.hover_pos());
+    if pointer.is_some_and(|position| !catalog_rect.contains(position)) {
         return None;
     }
-    let raw_delta = ui.input(|input| input.raw_scroll_delta.y);
+    // Once the pointer is over the actual list, let egui's ScrollArea own the
+    // wheel event. The forwarding path is only for the controls above it;
+    // otherwise the list and the proxy can apply the same event twice.
+    if list_rect.is_some_and(|rect| pointer.is_some_and(|position| rect.contains(position))) {
+        return None;
+    }
+    let delta = ui.input(|input| input.smooth_scroll_delta.y);
 
-    // Windows mouse wheels arrive as line events. egui deliberately spreads
-    // those events over several frames, but this proxy lives outside the
-    // ScrollArea and therefore cannot participate in that animation. Apply
-    // the native event once and discard the smoothed remainder so the list
-    // moves by a useful amount immediately and never scrolls twice.
+    // Consume the same smoothed delta that ScrollArea uses. This preserves
+    // egui's native wheel animation and prevents a leftover line-event delta
+    // from being applied again after the pointer moves into the list.
     ui.input_mut(|input| input.smooth_scroll_delta.y = 0.0);
-    if raw_delta.abs() <= f32::EPSILON {
+    if delta.abs() <= f32::EPSILON {
         return None;
     }
 
-    let scroll_id = ui.make_persistent_id(scroll_salt);
+    // ScrollArea::id_salt converts the salt to an egui::Id before asking the
+    // parent Ui for its persistent id. Mirror that exact identity here;
+    // passing the raw string would create a different state slot and reset
+    // the list to zero on every subsequent wheel frame.
+    let scroll_id = ui.make_persistent_id(egui::Id::new(scroll_salt));
     let current_offset = ui.ctx().data_mut(|data| {
         data.get_persisted::<egui::scroll_area::State>(scroll_id)
             .map_or(0.0, |state| state.offset.y)
     });
-    Some(current_offset - raw_delta)
+    Some(current_offset - delta)
 }
 
 fn protocol_chips(ui: &mut egui::Ui, report: &AnalysisReport, filters: &mut HashSet<Protocol>) {
@@ -1460,7 +1474,7 @@ fn is_visible(
     {
         return false;
     }
-    let lte = is_lte_name(config.name.as_deref());
+    let lte = is_lte_config(config);
     if matches!(lte_filter, LteFilter::Exclude) && lte
         || matches!(lte_filter, LteFilter::Only) && !lte
     {
@@ -1514,6 +1528,15 @@ pub fn is_lte_name(name: Option<&str>) -> bool {
             .any(|token| token.eq_ignore_ascii_case("lte"))
     })
     .unwrap_or(false)
+}
+
+fn is_lte_config(config: &ProxyConfig) -> bool {
+    is_lte_name(config.name.as_deref())
+        || config
+            .metadata
+            .labels
+            .iter()
+            .any(|label| is_lte_name(Some(label)))
 }
 
 fn diagnostic_passed(result: &DiagnosticResult) -> bool {
@@ -1633,7 +1656,7 @@ mod tests {
         catalog_wheel_target, is_lte_name, is_visible, ConnectivityFilter, DuplicateFilter,
         LteFilter,
     };
-    use crate::{model::Protocol, protocols::parse_uri};
+    use crate::{model::Protocol, protocols::parse_uri, resolver::xray::parse_configurations};
     use eframe::egui;
     use std::collections::{HashMap, HashSet};
 
@@ -1651,7 +1674,7 @@ mod tests {
                 },
                 |ctx| {
                     egui::CentralPanel::default().show(ctx, |ui| {
-                        let target = catalog_wheel_target(ui, "catalog-wheel-test");
+                        let target = catalog_wheel_target(ui, "catalog-wheel-test", None);
                         let mut scroll = egui::ScrollArea::vertical()
                             .id_salt("catalog-wheel-test")
                             .max_height(120.0)
@@ -1781,6 +1804,29 @@ mod tests {
             complete.original_text(),
             HashSet::new(),
             "-LTE"
+        ));
+    }
+
+    #[test]
+    fn lte_filter_checks_xray_outbound_tags_when_profile_name_is_not_lte() {
+        let source = url::Url::parse("https://example.test/profile").unwrap();
+        let configs = parse_configurations(
+            r#"[{"remarks":"Avito","outbounds":[{"protocol":"vless","tag":"lte-14-------48-LTE--------------","settings":{"vnext":[{"address":"lte.example.test","port":443,"users":[{"id":"00000000-0000-4000-8000-000000000001"}]}]}}]}]"#,
+            &source,
+            0,
+        );
+        assert_eq!(configs.len(), 1);
+        assert!(!is_visible(
+            0,
+            &configs[0],
+            &HashSet::new(),
+            None,
+            None,
+            ConnectivityFilter::All,
+            DuplicateFilter::All,
+            LteFilter::Exclude,
+            &HashMap::new(),
+            "",
         ));
     }
 }

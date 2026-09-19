@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::model::{ConversionLimitation, ProxyConfig, ShareUriResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,7 +18,11 @@ pub struct ShareExportSummary {
 
 pub fn share_export_summary(configs: &[ProxyConfig]) -> ShareExportSummary {
     let mut summary = ShareExportSummary::default();
+    let mut seen_semantic_keys = HashSet::new();
     for config in configs {
+        if !seen_semantic_keys.insert(config.semantic_key()) {
+            continue;
+        }
         match &config.share_uri {
             ShareUriResult::Available { uri } => summary.available.push(uri.clone()),
             ShareUriResult::Limited { uri, limitations } => {
