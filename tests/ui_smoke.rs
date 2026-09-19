@@ -407,7 +407,7 @@ fn compact_main_view_catalog_accepts_mouse_wheel() {
     }]);
 
     assert!(
-        after > before,
-        "compact catalog should move on mouse wheel: before={before}, after={after}"
+        after - before > 20.0,
+        "compact catalog should move by a visible amount on mouse wheel: before={before}, after={after}"
     );
 }

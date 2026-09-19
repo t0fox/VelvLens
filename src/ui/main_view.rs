@@ -813,19 +813,24 @@ fn catalog_wheel_target(ui: &mut egui::Ui, scroll_salt: &str) -> Option<f32> {
     if !ui.rect_contains_pointer(ui.max_rect()) {
         return None;
     }
-    let delta = ui.input(|input| input.smooth_scroll_delta.y);
-    if delta.abs() <= f32::EPSILON {
+    let raw_delta = ui.input(|input| input.raw_scroll_delta.y);
+
+    // Windows mouse wheels arrive as line events. egui deliberately spreads
+    // those events over several frames, but this proxy lives outside the
+    // ScrollArea and therefore cannot participate in that animation. Apply
+    // the native event once and discard the smoothed remainder so the list
+    // moves by a useful amount immediately and never scrolls twice.
+    ui.input_mut(|input| input.smooth_scroll_delta.y = 0.0);
+    if raw_delta.abs() <= f32::EPSILON {
         return None;
     }
+
     let scroll_id = ui.make_persistent_id(scroll_salt);
     let current_offset = ui.ctx().data_mut(|data| {
         data.get_persisted::<egui::scroll_area::State>(scroll_id)
             .map_or(0.0, |state| state.offset.y)
     });
-    // ScrollArea would otherwise consume this same delta a second time. The
-    // unprocessed remainder stays in egui and is routed on the next repaint.
-    ui.input_mut(|input| input.smooth_scroll_delta.y = 0.0);
-    Some(current_offset - delta)
+    Some(current_offset - raw_delta)
 }
 
 fn protocol_chips(ui: &mut egui::Ui, report: &AnalysisReport, filters: &mut HashSet<Protocol>) {
