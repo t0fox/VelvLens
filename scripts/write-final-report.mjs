@@ -46,7 +46,7 @@ const cleanInstall = process.env.VELVLENS_CLEAN_INSTALL === 'passed'
 const report = `# VelvLens Sub-Store migration report
 
 Generated: ${new Date().toISOString()}
-Git HEAD: \`${head}\`
+Git HEAD at evidence generation: \`${head}\`
 
 ## Pinned embedding
 
