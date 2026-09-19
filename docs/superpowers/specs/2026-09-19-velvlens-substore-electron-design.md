@@ -48,7 +48,7 @@ The generated runtime contains:
 
 - `substore/backend/sub-store.bundle.js`;
 - `substore/frontend/` with the original Vite output;
-- `runtime/node.exe`, downloaded from the official Node `v24.15.0` Windows x64 distribution and verified against SHA-256 `cc5149eabd53779ce1e7bdc5401643622d0c7e6800ade18928a767e940bb0e62`.
+- `runtime/node.exe`, downloaded from the official Node `v24.15.0` Windows x64 distribution and verified against the direct executable SHA-256 `3331e1ffe19874215472217c5e94f5a0c8f42e8c4ac7111d3937aa0ad5e9b4a5`.
 
 Build-time `pnpm` and Node are required only on the developer/CI machine. The installed user needs neither Node nor pnpm.
 
