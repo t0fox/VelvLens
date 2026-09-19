@@ -1,7 +1,0 @@
-{
-  "items": [
-    {"uri": "trojan://synthetic-password@example.net:443?security=tls"},
-    {"source": "https://nested.example/subscription"}
-  ],
-  "payload": {"lines": ["vless://12345678-1234-1234-1234-123456789abc@example.com:443"]}
-}

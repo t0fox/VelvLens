@@ -6,7 +6,5 @@
 release/
 node_modules/
 third_party/**/dist/
-.rustup-init*.exe
-rustup-init*.exe
 *.local.json
 .DS_Store

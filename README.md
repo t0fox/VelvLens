@@ -1,79 +1,79 @@
-# SubLens
+# VelvLens
 
-SubLens is a local Windows visual inspector for proxy subscription and share URLs. It resolves redirects and nested sources, decodes text/Base64/Base64URL/JSON/HTML payloads, parses proxy URIs into a normalized model, and shows the pipeline and configurations in a dark egui desktop interface.
+VelvLens is a standalone Windows Electron desktop application that embeds the
+pinned Sub-Store frontend and backend. It opens the original Sub-Store UI in a
+local BrowserWindow and starts the resolver locally; no external browser,
+Node.js installation, pnpm installation, cloud backend, or second resolver is
+required at runtime.
 
-## Workflow
+## Runtime flow
 
-1. Open SubLens.
-2. Paste a subscription or share URL.
-3. Select **Analyze**.
-4. Review the HTTP → Decode → Extract → Parse stages.
-5. Select a card to open the Inspector; on compact windows this is a separate details screen with **Back** and a pinned copy action. JSON profiles are resolved into individual endpoints and expose a generated share URI when the target protocol can represent the endpoint.
-6. Select protocol categories, combine Security/Transport/Status/Duplicates filters, use the three-state LTE filter, or enter selection mode for bulk copy.
-7. Use **Test** for local DNS/TCP connectivity evidence, or **Export** for separate available share URIs, explicitly limited URIs, original JSON documents, model JSON, and Base64 of available share URIs.
-8. Use **Copy selected** or **Copy all** to review counts for Available/Limited/Unavailable before copying. The primary bulk export contains only standard share URIs; original JSON is never mixed into that list.
-
-## Supported content
-
-- HTTP(S) sources with manual redirect-chain capture.
-- Raw line-oriented URI lists.
-- Standard Base64 and URL-safe Base64 without padding.
-- Nested JSON strings/arrays/objects.
-- Xray-compatible JSON profiles, expanded into separate proxy endpoints from `outbounds`, `vnext`, and `servers` while retaining one shared original document per source.
-- HTML DOM text, links, attributes, scripts, and embedded JSON.
-- Nested subscription URLs with loop/depth/byte/count limits.
-
-Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Socks5, Hysteria/Hysteria2/Hy2, and TUIC. Unknown URI schemes are preserved as inspectable **Unknown** configurations instead of being silently discarded.
-
-The catalog supports multiple protocol filters at once. The name/host search accepts exclusion terms such as `-LTE` or `-Torrent`, so unwanted categories can be left out before using selection mode. LTE detection is token-boundary aware and only examines the display name, so names such as `COMPLETE` and `DELETE` are not falsely excluded.
-
-The layout is compact-first below 1000 logical pixels: the catalog and Inspector become separate scrollable screens. The mouse wheel scrolls the entire catalog column, including its filters and search controls. Wide windows keep the catalog and Inspector side by side. Repaints follow the active Windows monitor refresh rate, with a bounded 60 Hz fallback when the rate cannot be read.
-
-## Privacy and safety
-
-- No analytics, telemetry, cloud backend, or external QR service.
-- HTTP, DNS, TCP, decoding, parsing, and QR generation run locally.
-- Pipeline previews, logs, and errors redact credentials and tokens. The selected configuration view and explicit copy/export actions preserve the original URI, source JSON, and usable credentials.
-- Raw response bodies are not written to disk automatically.
-- URL history is disabled by default. When enabled on Windows, it is protected with DPAPI and can be cleared.
-- DNS/TCP checks are connectivity-only; TCP success is not a claim that a VLESS/Reality protocol session works.
-
-## Build
-
-Install Rust stable and the Visual C++ Build Tools workload, then run from a Developer Command Prompt:
+On launch Electron starts the packaged Node.js 24.15.0 executable with the
+pinned Sub-Store backend bundle. The backend binds only to `127.0.0.1` and asks
+the OS for a dynamic port. After the readiness line is received, the
+BrowserWindow loads:
 
 ```text
-cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-targets --all-features
-cargo build --release --bins
+http://127.0.0.1:<dynamic-port>/?magicpath=velvlens-api
 ```
 
-The Windows executable is `target/release/sublens.exe`.
+Subscription data is kept below Electron's `userData/sub-store-data` directory.
+If the backend cannot start, VelvLens shows a bounded retry page and does not
+display raw process output or subscription data. External HTTP(S) links are
+opened through the system browser; other navigation and new windows are
+blocked.
 
-## Download
+## Use
 
-- [Скачать последний Windows exe из Release](../../releases/latest/download/sublens.exe)
-- [Открыть последний запуск GitHub Actions и скачать artifact](../../actions/workflows/ci.yml)
+1. Start VelvLens.
+2. Add a subscription or local source in the embedded Sub-Store interface.
+3. Review the resolved list and choose the required export format, such as
+   V2Ray.
 
-Каждый push и pull request проходит сборку и сохраняет downloadable Actions
-artifact `sublens-windows-x86_64`. Push тега `v*` дополнительно публикует
-`sublens.exe` в GitHub Release; стабильная ссылка выше всегда указывает на
-последний опубликованный exe.
+The packaged frontend/backend are upstream Sub-Store artifacts. VelvLens adds
+only the Electron lifecycle, loopback boundary, retry UI, packaging, product
+icon, and verification gates.
 
-## Live-safe acceptance
+## Build from source
 
-The optional manual command uses the normal bounded resolver and prints only sanitized stages, counts, protocol totals, and byte totals:
+The repository pins the upstream sources as git submodules. On a build machine
+with Node.js 24.15.0 and pnpm 11:
 
 ```text
-cargo run --bin live_acceptance -- --url <your-subscription-url>
+git submodule update --init --recursive
+pnpm install --frozen-lockfile
+pnpm test:electron
+pnpm build:substore
+pnpm build:runtime
+pnpm smoke:substore
+pnpm smoke:electron
+pnpm dist
+pnpm verify:package
+pnpm report
 ```
 
-The live URL is never used by automated tests, and subscription contents/credentials are not committed.
+`pnpm dist` creates both `release/VelvLens Setup 0.2.0.exe` and
+`release/VelvLens-portable.exe`. The portable executable contains Electron,
+the verified Node runtime, the pinned Sub-Store artifacts, and license notices;
+end users do not need Node or pnpm.
 
-## Known limitations
+## Fixtures and verification
 
-- Diagnostics currently stop at DNS and TCP connectivity; protocol-level Xray-core testing is not included.
-- Windows DPAPI history is implemented only when history is explicitly enabled.
-- Ordinary input URIs are copied byte-for-byte from their original representation. JSON endpoints have protocol-specific serializers for VLESS, VMess, Trojan, Shadowsocks, Hysteria2, and TUIC. Unsupported or ambiguous fields are reported as Limited/Unavailable instead of being silently dropped.
-- Hysteria2 follows the official URI scheme for credentials, SNI, display name, and multi-port authority syntax. Vendor-specific TLS fingerprints and QUIC extensions remain explicitly Limited; the original JSON export is the lossless fallback.
+`tests/fixtures/substore-vless.txt` is synthetic and safe for local smoke
+tests. `pnpm smoke:substore` exercises the embedded frontend, health endpoint,
+subscription insertion, list retrieval, and V2Ray export without logging the
+fixture body or writing decoded subscription data to disk.
+
+The evidence report is generated at
+`artifacts/velvlens-substore/final-report.md`. It records the Git HEAD, exact
+upstream commits, runtime flow, installer/portable sizes and hashes, package
+verification, and the boundaries between automated evidence, clean-install
+testing, and final human visual review.
+
+## Licensing and source availability
+
+VelvLens's Electron shell is MIT-licensed. The embedded Sub-Store backend is
+AGPL-3.0 and its frontend is GPL-3.0. Node.js licensing information is also
+shipped. See `THIRD_PARTY_NOTICES.md` and `LICENSES/`; the exact upstream
+repositories and commits remain available in `third_party/` for source
+retrieval and reproducible builds.

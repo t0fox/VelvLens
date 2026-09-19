@@ -1,0 +1,1 @@
+hysteria2://fixture-password@hy2.example.com:443?sni=hy2.example.com&insecure=0#Hysteria2%20Fixture

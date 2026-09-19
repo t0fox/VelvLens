@@ -1,0 +1,1 @@
+{"outbounds":[{"protocol":"vless","tag":"JSON Fixture","settings":{"vnext":[{"address":"json.example.com","port":443,"users":[{"id":"00000000-0000-0000-0000-000000000003"}]}]},"streamSettings":{"network":"ws","security":"tls","wsSettings":{"path":"/json","headers":{"Host":"json.example.com"}}}}]}

@@ -7,7 +7,14 @@ import { fileURLToPath } from 'node:url';
 import { startBackend, stopBackend } from '../electron/backend.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const fixture = (await readFile(join(root, 'tests', 'fixtures', 'substore-vless.txt'), 'utf8')).trim();
+const fixtureDirectory = join(root, 'tests', 'fixtures');
+const fixtures = [
+  ['fixture-vless', 'substore-vless.txt'],
+  ['fixture-base64', 'substore-base64.txt'],
+  ['fixture-hysteria2', 'substore-hysteria2.txt'],
+  ['fixture-json', 'substore-json.json'],
+  ['fixture-mixed', 'substore-mixed.txt'],
+];
 
 function assertStatus(response, expected, step) {
   assert.equal(response.status, expected, `${step} status`);
@@ -47,20 +54,25 @@ try {
   assertStatus(magicPathResponse, 200, 'magic-path frontend');
   assert.match(await magicPathResponse.text(), /<html/iu);
 
-  const createResponse = await fetch(`${runtime.origin}${runtime.backendPath}/api/subs`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'fixture', displayName: 'Fixture', source: 'local', content: fixture, process: [] }),
-  });
-  assert.ok([200, 201].includes(createResponse.status), `subscription create status ${createResponse.status}`);
-  await json(createResponse, 'subscription create');
+  for (const [name, fileName] of fixtures) {
+    const content = (await readFile(join(fixtureDirectory, fileName), 'utf8')).trim();
+    const createResponse = await fetch(`${runtime.origin}${runtime.backendPath}/api/subs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, displayName: name, source: 'local', content, process: [] }),
+    });
+    assert.ok([200, 201].includes(createResponse.status), `${name} create status ${createResponse.status}`);
+    await json(createResponse, `${name} create`);
+  }
 
   const listResponse = await fetch(`${runtime.origin}${runtime.backendPath}/api/subs`);
   assertStatus(listResponse, 200, 'subscription list');
   const subscriptions = await json(listResponse, 'subscription list');
-  assert.equal(containsName(subscriptions.data, 'fixture'), true, 'fixture appears in subscription list');
+  for (const [name] of fixtures) {
+    assert.equal(containsName(subscriptions.data, name), true, `${name} appears in subscription list`);
+  }
 
-  const exportResponse = await fetch(`${runtime.origin}${runtime.backendPath}/download/fixture/V2Ray`);
+  const exportResponse = await fetch(`${runtime.origin}${runtime.backendPath}/download/fixture-vless/V2Ray`);
   assertStatus(exportResponse, 200, 'V2Ray export');
   assert.match(exportResponse.headers.get('content-type') ?? '', /text\/plain/iu);
   const encoded = (await exportResponse.text()).trim();
@@ -69,7 +81,7 @@ try {
   assert.match(decoded, /vless:\/\//iu);
   assert.match(decoded, /example\.com/iu);
 
-  console.log('Sub-Store smoke passed: frontend, health, fixture list, and V2Ray export');
+  console.log('Sub-Store smoke passed: frontend, health, VLESS/Base64/Hysteria2/JSON/mixed fixtures, and V2Ray export');
 } finally {
   await stopBackend(runtime.child);
   await rm(dataRoot, { recursive: true, force: true });

@@ -1,0 +1,2 @@
+vless://00000000-0000-0000-0000-000000000004@mixed-vless.example.com:443?security=tls&type=ws&path=%2Fmixed&sni=mixed-vless.example.com#Mixed%20VLESS
+hysteria2://mixed-password@mixed-hy2.example.com:443?sni=mixed-hy2.example.com#Mixed%20Hysteria2

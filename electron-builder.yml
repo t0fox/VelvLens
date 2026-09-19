@@ -12,9 +12,6 @@ files:
   - '!third_party/**/*'
   - '!tests/**/*'
   - '!scripts/**/*'
-  - '!src/**/*'
-  - '!target/**/*'
-  - '!Cargo.*'
 extraResources:
   - from: .build/substore
     to: substore

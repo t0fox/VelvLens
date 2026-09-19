@@ -1,9 +1,0 @@
-{
-  "outbounds": [
-    {
-      "protocol": "vless",
-      "settings": {"vnext": []},
-      "streamSettings": {"network": "tcp"}
-    }
-  ]
-}
