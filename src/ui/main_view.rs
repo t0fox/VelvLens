@@ -227,13 +227,13 @@ fn draw_header(
     egui::TopBottomPanel::top("header")
         .resizable(false)
         .show_separator_line(false)
-        .min_height(if compact { 136.0 } else { 0.0 })
+        .min_height(if compact { 120.0 } else { 0.0 })
         .frame(
             egui::Frame::none()
                 .fill(theme::CANVAS)
                 .inner_margin(egui::Margin::symmetric(
                     if compact { 14.0 } else { 20.0 },
-                    8.0,
+                    if compact { 6.0 } else { 8.0 },
                 )),
         )
         .show(ctx, |ui| {
@@ -262,6 +262,13 @@ fn draw_header(
                                 .clicked()
                             {
                                 result.open_export = true;
+                                ui.close_menu();
+                            }
+                            if ui
+                                .add_enabled(report.is_some(), egui::Button::new("Скопировать все"))
+                                .clicked()
+                            {
+                                result.copy_all = true;
                                 ui.close_menu();
                             }
                             ui.separator();
@@ -303,6 +310,13 @@ fn draw_header(
                             result.open_settings = true;
                         }
                         ui.menu_button("Ещё", |ui| {
+                            if ui
+                                .add_enabled(report.is_some(), egui::Button::new("Скопировать все"))
+                                .clicked()
+                            {
+                                result.copy_all = true;
+                                ui.close_menu();
+                            }
                             let inspector_id = egui::Id::new("inspector-visible");
                             let mut inspector_visible = ctx.data_mut(|data| {
                                 data.get_persisted::<bool>(inspector_id).unwrap_or(false)
@@ -327,7 +341,7 @@ fn draw_header(
             });
 
             if compact {
-                ui.add_space(6.0);
+                ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     let paste_width = 72.0;
                     let analyze_width = 116.0;
@@ -376,19 +390,12 @@ fn draw_header(
                 });
                 ui.add_space(6.0);
                 if let Some(report) = report {
-                    ui.horizontal(|ui| {
-                        theme::badge(
-                            ui,
-                            "Готово",
-                            egui::Color32::from_rgba_unmultiplied(53, 208, 127, 35),
-                            theme::SUCCESS,
-                        );
-                        ui.label(
-                            egui::RichText::new(format!("Конфигураций: {}", report.configs.len()))
-                                .size(11.0)
-                                .color(theme::MUTED),
-                        );
-                    });
+                    theme::badge(
+                        ui,
+                        &format!("Готово · {} конфигураций", report.configs.len()),
+                        egui::Color32::from_rgba_unmultiplied(53, 208, 127, 35),
+                        theme::SUCCESS,
+                    );
                 } else {
                     let message = if running {
                         if status.is_empty() {
@@ -749,12 +756,12 @@ fn draw_catalog(
             );
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("Скопировать все").clicked() {
-                result.copy_all = true;
+            if !*selection_mode && ui.button("Выбрать").clicked() {
+                *selection_mode = true;
             }
         });
     });
-    ui.add_space(8.0);
+    ui.add_space(if compact { 4.0 } else { 6.0 });
     if !compact {
         protocol_chips(ui, report, protocol_filters);
         ui.add_space(6.0);
@@ -878,7 +885,7 @@ fn draw_catalog(
             }
         });
     }
-    ui.add_space(7.0);
+    ui.add_space(if compact { 4.0 } else { 6.0 });
     if *selection_mode {
         selection_controls(
             ui,
@@ -887,26 +894,8 @@ fn draw_catalog(
             selected_configs,
             selection_mode,
         );
-    } else if ui.button("Выбрать").clicked() {
-        *selection_mode = true;
     }
-    ui.add_space(6.0);
-    ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new("Список конфигураций")
-                .size(10.0)
-                .strong()
-                .color(theme::MUTED),
-        );
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(
-                egui::RichText::new(format!("Показано: {}", visible_indices.len()))
-                    .size(10.0)
-                    .color(theme::MUTED),
-            );
-        });
-    });
-    ui.add_space(6.0);
+    ui.add_space(if compact { 4.0 } else { 6.0 });
     if visible_indices.is_empty() {
         empty_catalog(ui, report, protocol_filters);
         return;
@@ -919,7 +908,7 @@ fn draw_catalog(
     scroll_style.bar_outer_margin = 2.0;
     scroll_style.foreground_color = true;
     ui.spacing_mut().scroll = scroll_style;
-    let row_height = 74.0;
+    let row_height = 66.0;
     let list_height = ui.available_height().max(120.0);
     let catalog_scroll_salt = if compact {
         "compact-config-list"

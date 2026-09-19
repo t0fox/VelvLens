@@ -32,7 +32,7 @@ pub fn show_with_mode(
         .clone()
         .unwrap_or_else(|| config.port.to_string());
     let card_rect =
-        egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), 68.0));
+        egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), 60.0));
     let hovered = ui
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|position| card_rect.contains(position));
@@ -55,11 +55,11 @@ pub fn show_with_mode(
         .fill(fill)
         .stroke(stroke)
         .rounding(egui::Rounding::same(theme::RADIUS_CARD))
-        .inner_margin(egui::Margin::symmetric(theme::SPACE_12, theme::SPACE_6))
+        .inner_margin(egui::Margin::symmetric(theme::SPACE_8, theme::SPACE_4))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 protocol_mark(ui, config.protocol);
-                ui.add_space(theme::SPACE_8);
+                ui.add_space(theme::SPACE_6);
                 ui.vertical(|ui| {
                     let name = config.name.as_deref().unwrap_or("Без названия");
                     ui.add(
@@ -70,7 +70,7 @@ pub fn show_with_mode(
                     ui.add(
                         egui::Label::new(
                             egui::RichText::new(&host)
-                                .size(10.5)
+                                .size(10.0)
                                 .color(theme::TEXT_MUTED),
                         )
                         .truncate(),
@@ -86,7 +86,7 @@ pub fn show_with_mode(
                     }
                 });
             });
-            ui.add_space(4.0);
+            ui.add_space(2.0);
             ui.horizontal_wrapped(|ui| {
                 theme::badge(
                     ui,
@@ -139,7 +139,7 @@ pub fn show_with_mode(
 }
 
 fn protocol_mark(ui: &mut egui::Ui, protocol: Protocol) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(26.0, 26.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(
         rect,
