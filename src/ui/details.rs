@@ -52,7 +52,7 @@ pub fn show(
                 }
             });
         });
-        ui.add_space(12.0);
+        ui.add_space(8.0);
         ui.horizontal_wrapped(|ui| {
             if config.transport != Transport::Unknown {
                 theme::badge(
@@ -122,17 +122,16 @@ pub fn show(
                 });
             }
         });
-        ui.add_space(12.0);
-        ui.add_space(4.0);
+        ui.add_space(8.0);
         ui.label(
             egui::RichText::new("ПАРАМЕТРЫ СОЕДИНЕНИЯ")
                 .size(10.0)
                 .strong()
                 .color(theme::TEXT_MUTED),
         );
-        ui.add_space(8.0);
+        ui.add_space(6.0);
         show_fields(ui, config, compact);
-        ui.add_space(12.0);
+        ui.add_space(8.0);
         egui::Frame::none()
             .inner_margin(egui::Margin::symmetric(0.0, 4.0))
             .show(ui, |ui| {
@@ -155,7 +154,6 @@ pub fn show(
                 .on_hover_text(&config.raw_uri);
             });
         if let Some(result) = diagnostic {
-            ui.add_space(12.0);
             ui.add_space(8.0);
             ui.label(
                 egui::RichText::new("ПРОВЕРКА СОЕДИНЕНИЯ")
@@ -226,10 +224,11 @@ fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig, compact: bool) {
         fields.push(("Дополнительные параметры", extra));
     }
 
-    if compact {
+    let two_columns = !compact && ui.available_width() >= 620.0;
+    if compact || !two_columns {
         egui::Grid::new(ui.id().with("configuration-fields"))
             .num_columns(2)
-            .spacing(egui::vec2(18.0, 10.0))
+            .spacing(egui::vec2(14.0, 8.0))
             .show(ui, |ui| {
                 for (label, value) in &fields {
                     ui.label(
@@ -256,7 +255,7 @@ fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig, compact: bool) {
             for (column_index, chunk) in fields.chunks(split).enumerate() {
                 egui::Grid::new(grid_id.with(("configuration-fields", column_index)))
                     .num_columns(2)
-                    .spacing(egui::vec2(14.0, 10.0))
+                    .spacing(egui::vec2(12.0, 8.0))
                     .show(&mut columns[column_index], |ui| {
                         for (label, value) in chunk {
                             ui.label(

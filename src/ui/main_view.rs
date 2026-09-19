@@ -629,9 +629,9 @@ fn show_wide(
 ) {
     egui::SidePanel::left("catalog")
         .resizable(true)
-        .default_width(336.0)
-        .min_width(286.0)
-        .max_width(420.0)
+        .default_width(320.0)
+        .min_width(280.0)
+        .max_width(380.0)
         .frame(theme::surface_frame(theme::SURFACE))
         .show(ctx, |ui| {
             draw_catalog(
@@ -658,7 +658,7 @@ fn show_wide(
         .frame(
             egui::Frame::none()
                 .fill(theme::CANVAS)
-                .inner_margin(egui::Margin::same(18.0)),
+                .inner_margin(egui::Margin::same(14.0)),
         )
         .show(ctx, |ui| {
             let Some(report) = report else {
@@ -762,9 +762,11 @@ fn draw_catalog(
         });
     });
     ui.add_space(if compact { 4.0 } else { 6.0 });
-    if !compact {
+    // Keep quick protocol chips only when the resizable catalog is wide enough;
+    // the Filters menu remains the canonical fallback at compact widths.
+    if !compact && ui.available_width() >= 360.0 {
         protocol_chips(ui, report, protocol_filters);
-        ui.add_space(6.0);
+        ui.add_space(4.0);
     }
     ui.horizontal(|ui| {
         let filter_width = if compact { 78.0 } else { 96.0 };
