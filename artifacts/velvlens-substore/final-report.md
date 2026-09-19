@@ -1,7 +1,7 @@
 # VelvLens Sub-Store migration report
 
-Generated: 2026-09-19T16:10:39.892Z
-Git HEAD at evidence generation: `55e98a5a7bb980f919e7cc1a2877bb6775a82ee7`
+Generated: 2026-09-19T16:35:01.187Z
+Git HEAD at evidence generation: `afce34e19f08787c095edd45ce18c48d77a2324e`
 
 ## Pinned embedding
 
@@ -21,8 +21,8 @@ Git HEAD at evidence generation: `55e98a5a7bb980f919e7cc1a2877bb6775a82ee7`
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| VelvLens Setup 0.2.0.exe | 137371902 | `557f0bf3f68fb36666efaad547975474861f31766f8dd21ccd5bfbc89306d112` |
-| VelvLens-portable.exe | 137145305 | `995635fd2d53f9a68e958f13ee663526490a4d152798ee1aa28dc6770b769873` |
+| VelvLens Setup 0.2.0.exe | 137371989 | `395a165f8e4d0253e461bff2395cde935f108706c03e62e7822bcfbccd6059e7` |
+| VelvLens-portable.exe | 137145387 | `c1a5df4eb838a7de7d4657ac6df42dc9be38ab2e32cb6564cdb7f766b49e19c6` |
 
 Package verification: PASS — the staged backend/frontend, Node runtime hash,
 license notices, exact manifest pins, no `node_modules`, and no legacy Rust
