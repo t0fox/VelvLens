@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VelvLens</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #11111a; color: #f5f3ff; }
+      main { width: min(560px, calc(100vw - 48px)); padding: 36px; border: 1px solid #3b3658; border-radius: 18px; background: #1a1826; box-shadow: 0 20px 70px #05050a66; }
+      h1 { margin: 0 0 14px; font-size: 24px; }
+      p { color: #bbb6cf; line-height: 1.5; }
+      #category { color: #d4caff; font-weight: 600; }
+      button { margin-top: 18px; border: 0; border-radius: 10px; padding: 11px 16px; background: #806bff; color: #fff; font: inherit; cursor: pointer; }
+      button:disabled { cursor: wait; opacity: .65; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Не удалось запустить локальный resolver</h1>
+      <p id="category">Ошибка запуска</p>
+      <p id="detail">Не удалось запустить локальный resolver.</p>
+      <button id="retry" type="button">Повторить запуск</button>
+    </main>
+  </body>
+</html>
