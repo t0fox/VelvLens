@@ -93,11 +93,22 @@ pub fn show(
     };
     let compact = ctx.screen_rect().width() < theme::WIDE_BREAKPOINT;
 
-    ctx.layer_painter(egui::LayerId::background()).rect_filled(
-        ctx.screen_rect(),
-        egui::Rounding::ZERO,
-        theme::CANVAS,
-    );
+    let background_painter = ctx.layer_painter(egui::LayerId::background());
+    if compact {
+        let shell = ctx.screen_rect().shrink(8.0);
+        background_painter.rect_filled(
+            shell,
+            egui::Rounding::same(theme::RADIUS_WINDOW),
+            theme::SURFACE,
+        );
+        background_painter.rect_stroke(
+            shell,
+            egui::Rounding::same(theme::RADIUS_WINDOW),
+            egui::Stroke::new(1.0_f32, theme::BORDER),
+        );
+    } else {
+        background_painter.rect_filled(ctx.screen_rect(), egui::Rounding::ZERO, theme::CANVAS);
+    }
 
     draw_header(
         ctx,
@@ -230,9 +241,13 @@ fn draw_header(
         .min_height(if compact { 120.0 } else { 0.0 })
         .frame(
             egui::Frame::none()
-                .fill(theme::CANVAS)
+                .fill(if compact {
+                    egui::Color32::TRANSPARENT
+                } else {
+                    theme::CANVAS
+                })
                 .inner_margin(egui::Margin::symmetric(
-                    if compact { 14.0 } else { 20.0 },
+                    if compact { 12.0 } else { 20.0 },
                     if compact { 6.0 } else { 8.0 },
                 )),
         )
@@ -241,7 +256,9 @@ fn draw_header(
             // transparent for one frame when its height changes. Paint the
             // panel background explicitly so the band never flashes as a
             // platform-default blue surface.
-            ui.painter().rect_filled(ui.max_rect(), 0.0, theme::CANVAS);
+            if !compact {
+                ui.painter().rect_filled(ui.max_rect(), 0.0, theme::CANVAS);
+            }
             ui.horizontal(|ui| {
                 theme::draw_logo(ui, if compact { 28.0 } else { 32.0 });
                 ui.add_space(5.0);
@@ -252,7 +269,15 @@ fn draw_header(
                 );
                 if compact {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.menu_button("Ещё", |ui| {
+                        ui.menu_button("...", |ui| {
+                            if ui.button("Вставить ссылку").clicked() {
+                                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                    if let Ok(text) = clipboard.get_text() {
+                                        *input = text;
+                                    }
+                                }
+                                ui.close_menu();
+                            }
                             if ui.button("Настройки").clicked() {
                                 result.open_settings = true;
                                 ui.close_menu();
@@ -343,42 +368,29 @@ fn draw_header(
             if compact {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    let paste_width = 72.0;
-                    let analyze_width = 116.0;
+                    let analyze_width = if running { 72.0 } else { 34.0 };
                     let input_width =
-                        (ui.available_width() - paste_width - analyze_width - theme::SPACE_16)
-                            .max(140.0);
+                        (ui.available_width() - analyze_width - theme::SPACE_8).max(140.0);
                     ui.add_sized(
                         [input_width, 32.0],
                         egui::TextEdit::singleline(input).hint_text("Вставьте ссылку на подписку…"),
                     );
                     if ui
                         .add_sized(
-                            [paste_width, 32.0],
-                            egui::Button::new("Вставить").fill(theme::SURFACE_RAISED),
-                        )
-                        .clicked()
-                    {
-                        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                            if let Ok(text) = clipboard.get_text() {
-                                *input = text;
-                            }
-                        }
-                    }
-                    if ui
-                        .add_sized(
                             [analyze_width, 32.0],
-                            egui::Button::new(if running {
-                                "Отмена"
-                            } else {
-                                "Анализировать"
-                            })
-                            .fill(if running {
-                                theme::SURFACE_RAISED
-                            } else {
-                                theme::ACCENT
-                            }),
+                            egui::Button::new(if running { "Отмена" } else { "▶" }).fill(
+                                if running {
+                                    theme::SURFACE_RAISED
+                                } else {
+                                    theme::ACCENT
+                                },
+                            ),
                         )
+                        .on_hover_text(if running {
+                            "Остановить анализ"
+                        } else {
+                            "Анализировать"
+                        })
                         .clicked()
                     {
                         if running {
@@ -390,12 +402,35 @@ fn draw_header(
                 });
                 ui.add_space(6.0);
                 if let Some(report) = report {
-                    theme::badge(
-                        ui,
-                        &format!("Готово · {} конфигураций", report.configs.len()),
-                        egui::Color32::from_rgba_unmultiplied(53, 208, 127, 35),
-                        theme::SUCCESS,
-                    );
+                    ui.horizontal(|ui| {
+                        let (icon_rect, _) =
+                            ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
+                        let painter = ui.painter_at(icon_rect);
+                        painter.circle_filled(icon_rect.center(), 4.0, theme::SUCCESS);
+                        let ink = egui::Stroke::new(1.0_f32, theme::CANVAS);
+                        painter.line_segment(
+                            [
+                                icon_rect.center() + egui::vec2(-2.0, 0.0),
+                                icon_rect.center() + egui::vec2(-0.5, 1.5),
+                            ],
+                            ink,
+                        );
+                        painter.line_segment(
+                            [
+                                icon_rect.center() + egui::vec2(-0.5, 1.5),
+                                icon_rect.center() + egui::vec2(2.5, -2.0),
+                            ],
+                            ink,
+                        );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Готово · {} конфигураций",
+                                report.configs.len()
+                            ))
+                            .size(11.0)
+                            .color(theme::TEXT_SECONDARY),
+                        );
+                    });
                 } else {
                     let message = if running {
                         if status.is_empty() {
@@ -535,8 +570,8 @@ fn show_compact(
     egui::CentralPanel::default()
         .frame(
             egui::Frame::none()
-                .fill(theme::CANVAS)
-                .inner_margin(egui::Margin::same(14.0)),
+                .fill(egui::Color32::TRANSPARENT)
+                .inner_margin(egui::Margin::same(10.0)),
         )
         .show(ctx, |ui| match compact_page {
             CompactPage::ConfigDetails => {
@@ -735,33 +770,31 @@ fn draw_catalog(
         diagnostics,
         search,
     );
-    ui.horizontal(|ui| {
-        ui.label(
-            egui::RichText::new("Конфигурации")
-                .size(if compact { 15.0 } else { 16.0 })
-                .strong(),
-        );
-        theme::badge(
-            ui,
-            &report.configs.len().to_string(),
-            theme::SURFACE_RAISED,
-            theme::TEXT_SECONDARY,
-        );
-        if !selected_configs.is_empty() {
+    if !compact {
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Конфигурации").size(16.0).strong());
             theme::badge(
                 ui,
-                &format!("Выбрано: {}", selected_configs.len()),
-                egui::Color32::from_rgba_unmultiplied(124, 58, 237, 36),
-                theme::ACCENT_HOVER,
+                &report.configs.len().to_string(),
+                theme::SURFACE_RAISED,
+                theme::TEXT_SECONDARY,
             );
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if !*selection_mode && ui.button("Выбрать").clicked() {
-                *selection_mode = true;
+            if !selected_configs.is_empty() {
+                theme::badge(
+                    ui,
+                    &format!("Выбрано: {}", selected_configs.len()),
+                    egui::Color32::from_rgba_unmultiplied(124, 58, 237, 36),
+                    theme::ACCENT_HOVER,
+                );
             }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if !*selection_mode && ui.button("Выбрать").clicked() {
+                    *selection_mode = true;
+                }
+            });
         });
-    });
-    ui.add_space(if compact { 4.0 } else { 6.0 });
+        ui.add_space(6.0);
+    }
     // Keep quick protocol chips only when the resizable catalog is wide enough;
     // the Filters menu remains the canonical fallback at compact widths.
     if !compact && ui.available_width() >= 360.0 {
@@ -796,7 +829,11 @@ fn draw_catalog(
                             [ui.available_width(), 24.0],
                             egui::TextEdit::singleline(search)
                                 .frame(false)
-                                .hint_text("Поиск конфигурации..."),
+                                .hint_text(if compact {
+                                    "Поиск..."
+                                } else {
+                                    "Поиск конфигурации..."
+                                }),
                         );
                     });
                 });
@@ -887,6 +924,31 @@ fn draw_catalog(
             }
         });
     }
+    if compact {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("Конфигурации").size(15.0).strong());
+            theme::badge(
+                ui,
+                &report.configs.len().to_string(),
+                theme::SURFACE_RAISED,
+                theme::TEXT_SECONDARY,
+            );
+            if !selected_configs.is_empty() {
+                theme::badge(
+                    ui,
+                    &format!("Выбрано: {}", selected_configs.len()),
+                    egui::Color32::from_rgba_unmultiplied(124, 58, 237, 36),
+                    theme::ACCENT_HOVER,
+                );
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if !*selection_mode && ui.button("Выбрать").clicked() {
+                    *selection_mode = true;
+                }
+            });
+        });
+    }
     ui.add_space(if compact { 4.0 } else { 6.0 });
     if *selection_mode {
         selection_controls(
@@ -910,7 +972,7 @@ fn draw_catalog(
     scroll_style.bar_outer_margin = 2.0;
     scroll_style.foreground_color = true;
     ui.spacing_mut().scroll = scroll_style;
-    let row_height = 66.0;
+    let row_height = if compact { 80.0 } else { 74.0 };
     let list_height = ui.available_height().max(120.0);
     let catalog_scroll_salt = if compact {
         "compact-config-list"
@@ -940,6 +1002,7 @@ fn draw_catalog(
                             selected_config.as_deref() == Some(config.id.as_str()),
                             selected_configs.contains(&config.id),
                             *selection_mode,
+                            compact,
                         )
                     })
                     .inner;

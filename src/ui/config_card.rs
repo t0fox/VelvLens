@@ -17,7 +17,7 @@ pub fn show(
     selected: bool,
     selected_for_export: bool,
 ) -> CardResponse {
-    show_with_mode(ui, config, selected, selected_for_export, false)
+    show_with_mode(ui, config, selected, selected_for_export, false, false)
 }
 
 pub fn show_with_mode(
@@ -26,13 +26,16 @@ pub fn show_with_mode(
     selected: bool,
     selected_for_export: bool,
     selection_mode: bool,
+    compact: bool,
 ) -> CardResponse {
     let port = config
         .port_range
         .clone()
         .unwrap_or_else(|| config.port.to_string());
-    let card_rect =
-        egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), 60.0));
+    let card_rect = egui::Rect::from_min_size(
+        ui.cursor().min,
+        egui::vec2(ui.available_width(), if compact { 76.0 } else { 60.0 }),
+    );
     let hovered = ui
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|position| card_rect.contains(position));
@@ -55,70 +58,128 @@ pub fn show_with_mode(
         .fill(fill)
         .stroke(stroke)
         .rounding(egui::Rounding::same(theme::RADIUS_CARD))
-        .inner_margin(egui::Margin::symmetric(theme::SPACE_8, theme::SPACE_4))
+        .inner_margin(egui::Margin::symmetric(
+            theme::SPACE_8,
+            if compact {
+                theme::SPACE_6
+            } else {
+                theme::SPACE_4
+            },
+        ))
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                protocol_mark(ui, config.protocol);
-                ui.add_space(theme::SPACE_6);
-                ui.vertical(|ui| {
-                    let name = config.name.as_deref().unwrap_or("Без названия");
-                    ui.add(
-                        egui::Label::new(egui::RichText::new(name).size(13.5).strong()).truncate(),
-                    )
-                    .on_hover_text(name);
-                    let host = format!("{}:{port}", config.host);
-                    ui.add(
-                        egui::Label::new(
-                            egui::RichText::new(&host)
-                                .size(10.0)
-                                .color(theme::TEXT_MUTED),
+            let name = config.name.as_deref().unwrap_or("Без названия");
+            let host = format!("{}:{port}", config.host);
+            if compact {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.add(
+                            egui::Label::new(egui::RichText::new(name).size(13.5).strong())
+                                .truncate(),
                         )
-                        .truncate(),
-                    )
-                    .on_hover_text(host);
-                });
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                    if selection_mode {
-                        let mut checked = selected_for_export;
-                        if ui.checkbox(&mut checked, "Выбрать").clicked() {
-                            selection_toggled = true;
+                        .on_hover_text(name);
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(&host)
+                                    .size(10.5)
+                                    .color(theme::TEXT_SECONDARY),
+                            )
+                            .truncate(),
+                        )
+                        .on_hover_text(&host);
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                        if selection_mode {
+                            let mut checked = selected_for_export;
+                            if ui.checkbox(&mut checked, "Выбрать").clicked() {
+                                selection_toggled = true;
+                            }
                         }
-                    }
+                        theme::badge(
+                            ui,
+                            config.protocol.as_str(),
+                            protocol_fill(config.protocol),
+                            egui::Color32::WHITE,
+                        );
+                    });
                 });
-            });
-            ui.add_space(2.0);
-            ui.horizontal_wrapped(|ui| {
-                theme::badge(
-                    ui,
-                    config.protocol.as_str(),
-                    protocol_fill(config.protocol),
-                    egui::Color32::WHITE,
-                );
+                ui.add_space(2.0);
+                let mut technical = Vec::new();
                 if config.security != crate::model::Security::Unknown {
-                    theme::badge(
-                        ui,
-                        config.security.as_str(),
-                        theme::SURFACE_RAISED,
-                        theme::TEXT_SECONDARY,
-                    );
+                    technical.push(config.security.as_str());
                 }
                 if config.transport != crate::model::Transport::Unknown {
-                    theme::badge(
-                        ui,
-                        config.transport.as_str(),
-                        theme::SURFACE_RAISED,
-                        theme::TEXT_SECONDARY,
+                    technical.push(config.transport.as_str());
+                }
+                if !technical.is_empty() {
+                    ui.label(
+                        egui::RichText::new(technical.join(" · "))
+                            .size(10.5)
+                            .color(theme::TEXT_SECONDARY),
                     );
                 }
-                if config.metadata.exact_duplicate_count > 1 {
+            } else {
+                ui.horizontal(|ui| {
+                    protocol_mark(ui, config.protocol);
+                    ui.add_space(theme::SPACE_6);
+                    ui.vertical(|ui| {
+                        ui.add(
+                            egui::Label::new(egui::RichText::new(name).size(13.5).strong())
+                                .truncate(),
+                        )
+                        .on_hover_text(name);
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(&host)
+                                    .size(10.0)
+                                    .color(theme::TEXT_MUTED),
+                            )
+                            .truncate(),
+                        )
+                        .on_hover_text(&host);
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                        if selection_mode {
+                            let mut checked = selected_for_export;
+                            if ui.checkbox(&mut checked, "Выбрать").clicked() {
+                                selection_toggled = true;
+                            }
+                        }
+                    });
+                });
+                ui.add_space(2.0);
+                ui.horizontal_wrapped(|ui| {
                     theme::badge(
                         ui,
-                        &format!("×{}", config.metadata.exact_duplicate_count),
-                        egui::Color32::from_rgba_unmultiplied(231, 173, 60, 34),
-                        theme::WARNING,
+                        config.protocol.as_str(),
+                        protocol_fill(config.protocol),
+                        egui::Color32::WHITE,
                     );
-                }
-            });
+                    if config.security != crate::model::Security::Unknown {
+                        theme::badge(
+                            ui,
+                            config.security.as_str(),
+                            theme::SURFACE_RAISED,
+                            theme::TEXT_SECONDARY,
+                        );
+                    }
+                    if config.transport != crate::model::Transport::Unknown {
+                        theme::badge(
+                            ui,
+                            config.transport.as_str(),
+                            theme::SURFACE_RAISED,
+                            theme::TEXT_SECONDARY,
+                        );
+                    }
+                    if config.metadata.exact_duplicate_count > 1 {
+                        theme::badge(
+                            ui,
+                            &format!("×{}", config.metadata.exact_duplicate_count),
+                            egui::Color32::from_rgba_unmultiplied(231, 173, 60, 34),
+                            theme::WARNING,
+                        );
+                    }
+                });
+            }
         });
     let response = ui.interact(
         card_rect,
