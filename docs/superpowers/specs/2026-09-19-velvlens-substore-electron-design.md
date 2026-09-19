@@ -19,7 +19,7 @@ The upstream sources are fixed as git submodules:
 | Backend | `https://github.com/sub-store-org/Sub-Store.git` | `8c2a695663b29a339f27651c6c683d54b04c7952` | `pnpm install --frozen-lockfile` then `pnpm bundle:esbuild` |
 | Frontend | `https://github.com/sub-store-org/Sub-Store-Front-End.git` | `628403546cca2c00056cad35d5e285f9c9874b6d` | `pnpm install --frozen-lockfile` then `pnpm build` |
 
-The verified upstream backend is version `2.39.9`, the frontend is version `2.31.2`, and both upstream `.node-version` files specify Node `24.15.0`. The backend bundle produces `dist/sub-store.bundle.js` and a runtime manifest with no external npm packages, while retaining Node builtins and the documented optional `shoutrrr` external binary. The bundle was run successfully without `node_modules` in a clean staging directory.
+The verified upstream backend is version `2.39.9`, the frontend is version `2.32.2`, and both upstream `.node-version` files specify Node `24.15.0`. The backend bundle produces `dist/sub-store.bundle.js` and a runtime manifest with no external npm packages, while retaining Node builtins and the documented optional `shoutrrr` external binary. The bundle was run successfully without `node_modules` in a clean staging directory.
 
 Sub-Store is AGPL-3.0. The frontend is GPL-3.0. VelvLens's wrapper license remains separate, but the distribution is explicitly composite and is never described as MIT-only.
 

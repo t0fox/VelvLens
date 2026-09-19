@@ -23,7 +23,7 @@ The distributed backend is the upstream esbuild bundle generated with:
 
 - Repository: https://github.com/sub-store-org/Sub-Store-Front-End
 - Pinned commit: `628403546cca2c00056cad35d5e285f9c9874b6d`
-- Release package version at that commit: `2.31.2`
+- Release package version at that commit: `2.32.2`
 - License: GNU General Public License v3.0 (`GPL-3.0`)
 - License text: `LICENSES/SUB-STORE-FRONTEND-GPL-3.0.txt`
 - Upstream license: https://github.com/sub-store-org/Sub-Store-Front-End/blob/628403546cca2c00056cad35d5e285f9c9874b6d/LICENSE
