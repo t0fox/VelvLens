@@ -1032,7 +1032,11 @@ fn draw_catalog(
 /// search field are part of the same visual column, so scrolling over them
 /// should continue moving the configuration list instead of doing nothing.
 fn catalog_wheel_target(ui: &mut egui::Ui, scroll_salt: &str) -> Option<f32> {
-    if !ui.rect_contains_pointer(ui.max_rect()) {
+    let catalog_rect = ui.max_rect();
+    let pointer_outside_catalog = ui
+        .input(|input| input.pointer.hover_pos())
+        .is_some_and(|position| !catalog_rect.contains(position));
+    if pointer_outside_catalog {
         return None;
     }
     let raw_delta = ui.input(|input| input.raw_scroll_delta.y);
@@ -1602,9 +1606,60 @@ fn draw_qr(ui: &mut egui::Ui, matrix: &crate::qr::QrMatrix) {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_lte_name, is_visible, ConnectivityFilter, DuplicateFilter, LteFilter};
+    use super::{
+        catalog_wheel_target, is_lte_name, is_visible, ConnectivityFilter, DuplicateFilter,
+        LteFilter,
+    };
     use crate::{model::Protocol, protocols::parse_uri};
+    use eframe::egui;
     use std::collections::{HashMap, HashSet};
+
+    #[test]
+    fn catalog_wheel_is_routed_without_a_pointer_position() {
+        let context = egui::Context::default();
+        let viewport = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(420.0, 260.0));
+        let render = |events: Vec<egui::Event>| {
+            let mut offset = None;
+            let _ = context.run(
+                egui::RawInput {
+                    screen_rect: Some(viewport),
+                    events,
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        let target = catalog_wheel_target(ui, "catalog-wheel-test");
+                        let mut scroll = egui::ScrollArea::vertical()
+                            .id_salt("catalog-wheel-test")
+                            .max_height(120.0)
+                            .min_scrolled_height(120.0);
+                        if let Some(target) = target {
+                            scroll = scroll.vertical_scroll_offset(target);
+                        }
+                        let output = scroll.show_rows(ui, 32.0, 20, |ui, rows| {
+                            for row in rows {
+                                ui.label(format!("Configuration {row}"));
+                            }
+                        });
+                        offset = Some(output.state.offset.y);
+                    });
+                },
+            );
+            offset.expect("catalog scroll area should render")
+        };
+
+        let before = render(vec![egui::Event::PointerGone]);
+        let after = render(vec![egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, -3.0),
+            modifiers: egui::Modifiers::default(),
+        }]);
+
+        assert!(
+            after > before,
+            "a native wheel event must scroll without a prior pointer-move event: before={before}, after={after}"
+        );
+    }
 
     fn matches_filter(uri: &str, protocols: HashSet<Protocol>, search: &str) -> bool {
         let config = parse_uri(uri, None, 0).expect("fixture URI should parse");
