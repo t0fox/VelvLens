@@ -1,7 +1,7 @@
 # VelvLens Sub-Store migration report
 
-Generated: 2026-09-19T16:35:01.187Z
-Git HEAD at evidence generation: `afce34e19f08787c095edd45ce18c48d77a2324e`
+Generated: 2026-09-19T19:56:00Z
+Git HEAD at evidence generation: `007181cfe7b5db77f0f29a80bccbe6fcab6494f0`
 
 ## Pinned embedding
 
@@ -39,6 +39,33 @@ Windows build.
   BrowserWindow readiness and backend shutdown.
 - Clean-install portable EXE: PASS (reported by the clean-install gate).
 - Final visual/accessibility approval: separate human review gate, not inferred from smoke tests.
+
+## Localhost and IPC feasibility audit
+
+- The original frontend uses one Axios instance with a configurable `baseURL`
+  and also contains direct Axios calls for backend checks, blob exports, and
+  external URLs. Its API surface includes `/api/*`, `/download/*`, and
+  `/share/*` behavior; this is not a single health endpoint that can be
+  replaced transparently.
+- The original Node backend registers the complete REST surface and calls
+  `app.listen(host, port)`. The generated CommonJS bundle is a side-effecting
+  application entrypoint and does not expose a request dispatcher or route
+  registry for an Electron IPC adapter.
+- Throwaway in-process probe: PASS for running the unchanged backend bundle in
+  the Electron main process and receiving `200` from
+  `/velvlens-api/api/utils/env`; the backend still opened a dynamic
+  `127.0.0.1` listener. This proves only that a child `node.exe` can be removed
+  while retaining loopback HTTP, not that the full UI contract is safe in
+  process.
+- Throwaway direct-resource probe: the original frontend loaded only its
+  `file://` HTML shell; absolute `/index.js` and `/registerSW.js` resolved to
+  the drive root and failed with `ERR_FILE_NOT_FOUND`, leaving `#app` empty.
+- Decision: keep the current loopback transport and packaged Node runtime.
+  A no-HTTP IPC variant would require changing the upstream backend entry and
+  response lifecycle plus the frontend Axios adapter, direct Axios calls,
+  blob/download links, share paths, and navigation/PWA assumptions. That is a
+  large custom transport rewrite, so it is rejected in favor of the verified
+  original Sub-Store behavior.
 
 ## Source and licensing
 
