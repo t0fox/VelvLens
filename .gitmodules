@@ -1,0 +1,6 @@
+[submodule "third_party/sub-store"]
+	path = third_party/sub-store
+	url = https://github.com/sub-store-org/Sub-Store.git
+[submodule "third_party/sub-store-frontend"]
+	path = third_party/sub-store-frontend
+	url = https://github.com/sub-store-org/Sub-Store-Front-End.git
