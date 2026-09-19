@@ -27,7 +27,7 @@ Supported protocols are VLESS, VMess, Trojan, Shadowsocks, Socks5, Hysteria/Hyst
 
 The catalog supports multiple protocol filters at once. The name/host search accepts exclusion terms such as `-LTE` or `-Torrent`, so unwanted categories can be left out before using selection mode. LTE detection is token-boundary aware and only examines the display name, so names such as `COMPLETE` and `DELETE` are not falsely excluded.
 
-The layout is compact-first below 1000 logical pixels: the catalog and Inspector become separate scrollable screens. Wide windows keep the catalog and Inspector side by side. Repaints follow the active Windows monitor refresh rate, with a bounded 60 Hz fallback when the rate cannot be read.
+The layout is compact-first below 1000 logical pixels: the catalog and Inspector become separate scrollable screens. The mouse wheel scrolls the entire catalog column, including its filters and search controls. Wide windows keep the catalog and Inspector side by side. Repaints follow the active Windows monitor refresh rate, with a bounded 60 Hz fallback when the rate cannot be read.
 
 ## Privacy and safety
 

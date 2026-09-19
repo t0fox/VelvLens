@@ -17,6 +17,7 @@ pub struct MainViewResult {
     pub analyze: bool,
     pub cancel: bool,
     pub selected: Option<String>,
+    pub catalog_scroll_offset: Option<f32>,
     pub copy_all: bool,
     pub copy_selected: bool,
     pub open_settings: bool,
@@ -83,6 +84,7 @@ pub fn show(
         analyze: false,
         cancel: false,
         selected: selected_config.clone(),
+        catalog_scroll_offset: None,
         copy_all: false,
         copy_selected: false,
         open_settings: false,
@@ -751,17 +753,23 @@ fn draw_catalog(
     ui.spacing_mut().scroll = scroll_style;
     let row_height = if *selection_mode { 78.0 } else { 74.0 };
     let list_height = ui.available_height().max(120.0);
-    egui::ScrollArea::vertical()
-        .id_salt(if compact {
-            "compact-config-list"
-        } else {
-            "wide-config-list"
-        })
+    let catalog_scroll_salt = if compact {
+        "compact-config-list"
+    } else {
+        "wide-config-list"
+    };
+    let wheel_target = catalog_wheel_target(ui, catalog_scroll_salt);
+    let mut catalog_scroll = egui::ScrollArea::vertical()
+        .id_salt(catalog_scroll_salt)
         .max_height(list_height)
         .min_scrolled_height(list_height)
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
-        .auto_shrink([false, false])
-        .show_rows(ui, row_height, visible_indices.len(), |ui, row_range| {
+        .auto_shrink([false, false]);
+    if let Some(target) = wheel_target {
+        catalog_scroll = catalog_scroll.vertical_scroll_offset(target);
+    }
+    let _scroll_output =
+        catalog_scroll.show_rows(ui, row_height, visible_indices.len(), |ui, row_range| {
             for row in row_range {
                 let index = visible_indices[row];
                 let config = &report.configs[index];
@@ -793,6 +801,31 @@ fn draw_catalog(
                 ui.add_space(6.0);
             }
         });
+    {
+        result.catalog_scroll_offset = Some(_scroll_output.state.offset.y);
+    }
+}
+
+/// Keep the catalog wheel target larger than the list itself. The filters and
+/// search field are part of the same visual column, so scrolling over them
+/// should continue moving the configuration list instead of doing nothing.
+fn catalog_wheel_target(ui: &mut egui::Ui, scroll_salt: &str) -> Option<f32> {
+    if !ui.rect_contains_pointer(ui.max_rect()) {
+        return None;
+    }
+    let delta = ui.input(|input| input.smooth_scroll_delta.y);
+    if delta.abs() <= f32::EPSILON {
+        return None;
+    }
+    let scroll_id = ui.make_persistent_id(scroll_salt);
+    let current_offset = ui.ctx().data_mut(|data| {
+        data.get_persisted::<egui::scroll_area::State>(scroll_id)
+            .map_or(0.0, |state| state.offset.y)
+    });
+    // ScrollArea would otherwise consume this same delta a second time. The
+    // unprocessed remainder stays in egui and is routed on the next repaint.
+    ui.input_mut(|input| input.smooth_scroll_delta.y = 0.0);
+    Some(current_offset - delta)
 }
 
 fn protocol_chips(ui: &mut egui::Ui, report: &AnalysisReport, filters: &mut HashSet<Protocol>) {
