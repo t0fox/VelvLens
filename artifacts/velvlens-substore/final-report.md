@@ -1,7 +1,7 @@
 # VelvLens Sub-Store migration report
 
-Generated: 2026-09-19T16:08:52.983Z
-Git HEAD: `587f8dbd5a599e5989b58b698035c1cc2aef2889`
+Generated: 2026-09-19T16:09:04.123Z
+Git HEAD: `9a0ffe52a59dddd75a24e2e9dee80bdf63d97684`
 
 ## Pinned embedding
 
