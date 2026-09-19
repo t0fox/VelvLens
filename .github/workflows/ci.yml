@@ -49,3 +49,35 @@ jobs:
         with:
           files: target/release/sublens.exe
           generate_release_notes: true
+
+  electron-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.0.9
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:electron
+      - run: pnpm build:substore
+      - run: pnpm build:runtime
+      - run: pnpm smoke:substore
+      - run: pnpm smoke:electron
+      - run: pnpm dist
+      - run: pnpm verify:package
+      - run: pnpm report
+      - name: Upload Electron artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: velvlens-windows
+          path: |
+            release/*.exe
+            artifacts/velvlens-substore/final-report.md
+          if-no-files-found: error

@@ -14,12 +14,13 @@
     "test:electron": "node --test tests/electron/*.test.mjs",
     "smoke:substore": "node scripts/smoke-substore.mjs",
     "smoke:electron": "node scripts/smoke-electron.mjs",
+    "verify:package": "node scripts/verify-package.mjs release/win-unpacked",
+    "report": "node scripts/write-final-report.mjs",
     "dist": "pnpm build:substore && pnpm build:runtime && electron-builder --win nsis portable"
   },
-  "dependencies": {
-    "electron": "44.4.3"
-  },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "electron": "44.4.3",
     "electron-builder": "26.15.3"
   }
 }
