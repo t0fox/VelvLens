@@ -35,7 +35,10 @@ jobs:
       - run: pnpm smoke:electron
       - run: pnpm dist
       - run: pnpm verify:package
+      - run: pnpm smoke:portable
       - run: pnpm report
+        env:
+          VELVLENS_CLEAN_INSTALL: passed
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4
         with:

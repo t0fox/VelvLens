@@ -14,6 +14,7 @@
     "test:electron": "node --test tests/electron/*.test.mjs",
     "smoke:substore": "node scripts/smoke-substore.mjs",
     "smoke:electron": "node scripts/smoke-electron.mjs",
+    "smoke:portable": "node scripts/clean-install-smoke.mjs",
     "verify:package": "node scripts/verify-package.mjs release/win-unpacked",
     "report": "node scripts/write-final-report.mjs",
     "dist": "pnpm build:substore && pnpm build:runtime && electron-builder --win nsis portable"

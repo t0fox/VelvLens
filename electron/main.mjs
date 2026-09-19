@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
+import { appendFile } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -155,8 +156,17 @@ async function shutdown() {
   await stopBackend(child);
 }
 
-function emitSmokeMarker(message) {
-  if (process.env.VELVLENS_SMOKE === '1') process.stdout.write(`[VELVLENS_SMOKE] ${message}\n`);
+async function emitSmokeMarker(message) {
+  if (process.env.VELVLENS_SMOKE !== '1') return;
+  const line = `[VELVLENS_SMOKE] ${message}`;
+  process.stdout.write(`${line}\n`);
+  if (process.env.VELVLENS_SMOKE_FILE) {
+    try {
+      await appendFile(process.env.VELVLENS_SMOKE_FILE, `${line}\n`, 'utf8');
+    } catch {
+      // Smoke signaling must never affect the application lifecycle.
+    }
+  }
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -169,9 +179,9 @@ if (!gotLock) {
     ipcMain.handle('backend:retry', retryBackend);
     await createMainWindow();
     if (backendRuntime) {
-      emitSmokeMarker(`READY title=${WINDOW_TITLE} backend=loopback child=${backendRuntime.child.pid ?? 0}`);
+      await emitSmokeMarker(`READY title=${WINDOW_TITLE} backend=loopback child=${backendRuntime.child.pid ?? 0}`);
     } else {
-      emitSmokeMarker(`ERROR code=${lastFailureCode ?? 'BACKEND_START_FAILED'}`);
+      await emitSmokeMarker(`ERROR code=${lastFailureCode ?? 'BACKEND_START_FAILED'}`);
     }
     if (process.env.VELVLENS_SMOKE_EXIT === '1') setTimeout(() => app.quit(), 400);
     app.on('activate', () => void createMainWindow());
