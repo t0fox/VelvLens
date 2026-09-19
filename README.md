@@ -53,10 +53,13 @@ The Windows executable is `target/release/sublens.exe`.
 
 ## Download
 
-- [Download the latest Windows executable](../../releases/latest/download/sublens.exe)
-- [Open GitHub Actions builds](../../actions/workflows/ci.yml)
+- [Скачать последний Windows exe из Release](../../releases/latest/download/sublens.exe)
+- [Открыть последний запуск GitHub Actions и скачать artifact](../../actions/workflows/ci.yml)
 
-Every push and pull request keeps a downloadable Actions artifact. A `v*` tag also publishes `sublens.exe` to a GitHub Release, which is the stable download linked above.
+Каждый push и pull request проходит сборку и сохраняет downloadable Actions
+artifact `sublens-windows-x86_64`. Push тега `v*` дополнительно публикует
+`sublens.exe` в GitHub Release; стабильная ссылка выше всегда указывает на
+последний опубликованный exe.
 
 ## Live-safe acceptance
 
