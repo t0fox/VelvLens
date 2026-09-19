@@ -10,7 +10,7 @@ default-run = "sublens"
 arboard = "3.4"
 base64 = "0.22"
 directories = "6"
-eframe = "0.29"
+eframe = { version = "0.29", features = ["wgpu"] }
 egui = "0.29"
 futures-util = "0.3"
 percent-encoding = "2.3"
@@ -18,6 +18,7 @@ qrcode = "0.14"
 regex = "1.11"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate", "zstd"] }
 scraper = "0.22"
+png = "0.18"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"

@@ -1,86 +1,111 @@
+use std::time::{Duration, Instant};
+
 use eframe::egui;
 
-use crate::{model::ProxyConfig, qr::QrMatrix, security::redact_uri};
+use crate::{
+    model::{ProxyConfig, Security, Transport},
+    qr::QrMatrix,
+};
 
 use super::theme;
 
 pub fn show(
     ui: &mut egui::Ui,
     config: &ProxyConfig,
-    show_sensitive: bool,
     qr: &mut Option<QrMatrix>,
     diagnostic: Option<&crate::diagnostics::DiagnosticResult>,
+    copied_until: &mut Option<Instant>,
 ) -> bool {
+    let json_payload = is_json_payload(config);
+    if copied_until.is_some_and(|until| until <= Instant::now()) {
+        *copied_until = None;
+    }
     let mut test = false;
     theme::surface_frame(theme::SURFACE).show(ui, |ui| {
         ui.horizontal(|ui| {
             protocol_badge(ui, config.protocol.as_str());
             ui.add_space(2.0);
             ui.vertical(|ui| {
-                ui.label(
-                    egui::RichText::new(config.name.as_deref().unwrap_or("Unnamed configuration"))
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(
+                            config.name.as_deref().unwrap_or("Unnamed configuration"),
+                        )
                         .size(19.0)
                         .strong(),
+                    )
+                    .truncate(),
                 );
                 ui.label(
-                    egui::RichText::new(format!("{}:{}", config.host, config.port))
+                    egui::RichText::new(format!("{}:{}", config.host, display_port(config)))
                         .size(12.0)
                         .color(theme::MUTED),
                 );
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                theme::badge(
-                    ui,
-                    config.security.as_str(),
-                    egui::Color32::from_rgba_unmultiplied(53, 208, 127, 35),
-                    theme::SUCCESS,
-                );
+                if config.security != Security::Unknown {
+                    theme::badge(
+                        ui,
+                        config.security.as_str(),
+                        egui::Color32::from_rgba_unmultiplied(53, 208, 127, 35),
+                        theme::SUCCESS,
+                    );
+                }
             });
         });
-        ui.add_space(14.0);
+        ui.add_space(12.0);
         ui.horizontal_wrapped(|ui| {
-            theme::badge(
-                ui,
-                config.transport.as_str(),
-                theme::SURFACE_RAISED,
-                theme::MUTED,
-            );
+            if config.transport != Transport::Unknown {
+                theme::badge(
+                    ui,
+                    config.transport.as_str(),
+                    theme::SURFACE_RAISED,
+                    theme::MUTED,
+                );
+            }
             if let Some(flow) = &config.flow {
                 theme::badge(ui, flow, theme::SURFACE_RAISED, theme::MUTED);
             }
         });
         ui.add_space(12.0);
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
+            let copied = copied_until.is_some();
             if ui
                 .add_sized(
-                    [132.0, 34.0],
-                    egui::Button::new(egui::RichText::new("Copy URI").strong()).fill(theme::ACCENT),
+                    [190.0, 36.0],
+                    egui::Button::new(if copied {
+                        egui::RichText::new("✓ Copied").strong()
+                    } else if json_payload {
+                        egui::RichText::new("Copy JSON config").strong()
+                    } else {
+                        egui::RichText::new("Copy configuration").strong()
+                    })
+                    .fill(theme::ACCENT),
                 )
                 .clicked()
             {
-                copy_to_clipboard(&config.raw_uri);
+                copy_config(config, copied_until);
             }
             if ui
                 .add_sized(
-                    [122.0, 34.0],
-                    egui::Button::new("Copy safe").fill(theme::SURFACE_RAISED),
+                    [68.0, 36.0],
+                    egui::Button::new("Copy").fill(theme::SURFACE_RAISED),
                 )
                 .clicked()
             {
-                copy_to_clipboard(&redact_uri(&config.raw_uri));
+                copy_config(config, copied_until);
             }
-            if ui
-                .add_sized(
-                    [82.0, 34.0],
-                    egui::Button::new("QR").fill(theme::SURFACE_RAISED),
-                )
-                .clicked()
-            {
+            let qr_response = ui.add_enabled(
+                !json_payload,
+                egui::Button::new(if json_payload { "QR unavailable" } else { "QR" })
+                    .fill(theme::SURFACE_RAISED),
+            );
+            if qr_response.clicked() {
                 *qr = Some(crate::qr::encode(&config.raw_uri));
             }
             if ui
                 .add_sized(
-                    [88.0, 34.0],
+                    [88.0, 36.0],
                     egui::Button::new("Test").fill(theme::SURFACE_RAISED),
                 )
                 .clicked()
@@ -92,77 +117,46 @@ pub fn show(
         ui.separator();
         ui.add_space(10.0);
         ui.label(
-            egui::RichText::new("CONNECTION DETAILS")
+            egui::RichText::new("CONFIGURATION DETAILS")
                 .size(10.0)
                 .strong()
                 .color(theme::MUTED),
         );
         ui.add_space(8.0);
-        let address = compact_value(&config.host, 32);
-        let sni = compact_value(config.sni.as_deref().unwrap_or("—"), 24);
-        let fingerprint = compact_value(config.fingerprint.as_deref().unwrap_or("—"), 20);
-        let public_key = compact_value(config.reality_public_key.as_deref().unwrap_or("—"), 28);
-        let short_id = compact_value(config.reality_short_id.as_deref().unwrap_or("—"), 18);
-        let uuid = if show_sensitive {
-            compact_value(config.uuid.as_deref().unwrap_or("—"), 24)
-        } else {
-            "••••••".to_owned()
-        };
-        let password = if show_sensitive {
-            compact_value(config.password.as_deref().unwrap_or("—"), 24)
-        } else {
-            "••••••".to_owned()
-        };
-        egui::Grid::new(ui.id().with("configuration-fields"))
-            .num_columns(4)
-            .spacing(egui::vec2(18.0, 10.0))
-            .show(ui, |ui| {
-                detail_pair(
-                    ui,
-                    "Address",
-                    &address,
-                    "Transport",
-                    config.transport.as_str(),
-                );
-                ui.end_row();
-                detail_pair(ui, "Port", &config.port.to_string(), "SNI", &sni);
-                ui.end_row();
-                detail_pair(
-                    ui,
-                    "Security",
-                    config.security.as_str(),
-                    "Fingerprint",
-                    &fingerprint,
-                );
-                ui.end_row();
-                detail_pair(ui, "Public key", &public_key, "Short ID", &short_id);
-                ui.end_row();
-                detail_pair(ui, "UUID", &uuid, "Password", &password);
-                ui.end_row();
-            });
+        show_fields(ui, config);
         ui.add_space(12.0);
-        ui.horizontal(|ui| {
-            ui.label(
-                egui::RichText::new("Credentials are masked by default")
-                    .size(11.0)
-                    .color(theme::MUTED),
-            );
-        });
-        ui.add_space(8.0);
         egui::Frame::none()
             .fill(theme::CANVAS)
             .stroke(egui::Stroke::new(1.0_f32, theme::BORDER))
             .rounding(egui::Rounding::same(8.0))
             .inner_margin(egui::Margin::symmetric(10.0, 8.0))
             .show(ui, |ui| {
-                ui.label(
-                    egui::RichText::new("Configuration URI")
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(if json_payload {
+                            "Configuration JSON"
+                        } else {
+                            "Configuration URI"
+                        })
                         .size(11.0)
+                        .strong()
                         .color(theme::MUTED),
-                );
-                let mut sanitized_uri = redact_uri(&config.raw_uri);
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add_sized(
+                                [58.0, 24.0],
+                                egui::Button::new("Copy").fill(theme::SURFACE_RAISED),
+                            )
+                            .clicked()
+                        {
+                            copy_config(config, copied_until);
+                        }
+                    });
+                });
+                let mut raw_uri = config.raw_uri.clone();
                 ui.add(
-                    egui::TextEdit::singleline(&mut sanitized_uri)
+                    egui::TextEdit::singleline(&mut raw_uri)
                         .desired_width(f32::INFINITY)
                         .interactive(false),
                 );
@@ -201,6 +195,96 @@ pub fn show(
     test
 }
 
+fn show_fields(ui: &mut egui::Ui, config: &ProxyConfig) {
+    let mut fields = vec![
+        ("Protocol", config.protocol.as_str().to_owned()),
+        ("Address", config.host.clone()),
+        ("Port", display_port(config)),
+    ];
+    if config.security != Security::Unknown {
+        fields.push(("Security", config.security.as_str().to_owned()));
+    }
+    if config.transport != Transport::Unknown {
+        fields.push(("Transport", config.transport.as_str().to_owned()));
+    }
+    add_optional(&mut fields, "SNI", config.sni.as_deref());
+    add_optional(&mut fields, "Fingerprint", config.fingerprint.as_deref());
+    add_optional(
+        &mut fields,
+        "Public key",
+        config.reality_public_key.as_deref(),
+    );
+    add_optional(&mut fields, "Short ID", config.reality_short_id.as_deref());
+    add_optional(&mut fields, "UUID", config.uuid.as_deref());
+    add_optional(&mut fields, "Username", config.username.as_deref());
+    add_optional(&mut fields, "Password", config.password.as_deref());
+    add_optional(&mut fields, "Flow", config.flow.as_deref());
+    add_optional(&mut fields, "Encryption", config.encryption.as_deref());
+    add_optional(&mut fields, "Path", config.path.as_deref());
+    add_optional(&mut fields, "Host", config.host_header.as_deref());
+    add_optional(&mut fields, "Service name", config.service_name.as_deref());
+    add_optional(&mut fields, "Mode", config.mode.as_deref());
+    if !config.unknown_params.is_empty() {
+        let extra = config
+            .unknown_params
+            .iter()
+            .flat_map(|(key, values)| values.iter().map(move |value| format!("{key}={value}")))
+            .collect::<Vec<_>>()
+            .join(" · ");
+        fields.push(("Additional parameters", extra));
+    }
+
+    egui::Grid::new(ui.id().with("configuration-fields"))
+        .num_columns(4)
+        .spacing(egui::vec2(18.0, 10.0))
+        .show(ui, |ui| {
+            for pair in fields.chunks(2) {
+                for (label, value) in pair {
+                    ui.label(egui::RichText::new(*label).size(11.0).color(theme::MUTED));
+                    ui.label(
+                        egui::RichText::new(compact_value(value, 42))
+                            .size(12.0)
+                            .strong(),
+                    );
+                }
+                if pair.len() == 1 {
+                    ui.label("");
+                    ui.label("");
+                }
+                ui.end_row();
+            }
+        });
+}
+
+fn add_optional(
+    fields: &mut Vec<(&'static str, String)>,
+    label: &'static str,
+    value: Option<&str>,
+) {
+    if let Some(value) = value.filter(|value| !value.is_empty()) {
+        fields.push((label, value.to_owned()));
+    }
+}
+
+fn display_port(config: &ProxyConfig) -> String {
+    config
+        .port_range
+        .clone()
+        .unwrap_or_else(|| config.port.to_string())
+}
+
+fn copy_config(config: &ProxyConfig, copied_until: &mut Option<Instant>) {
+    copy_to_clipboard(&config.raw_uri);
+    *copied_until = Some(Instant::now() + Duration::from_secs(2));
+}
+
+fn is_json_payload(config: &ProxyConfig) -> bool {
+    matches!(
+        config.raw_uri.trim_start().chars().next(),
+        Some('{') | Some('[')
+    )
+}
+
 fn status_badge(ui: &mut egui::Ui, label: &str, status: &crate::diagnostics::CheckStatus) {
     let (text, fill, color) = match status {
         crate::diagnostics::CheckStatus::Passed => (
@@ -224,17 +308,6 @@ fn status_badge(ui: &mut egui::Ui, label: &str, status: &crate::diagnostics::Che
 
 fn protocol_badge(ui: &mut egui::Ui, protocol: &str) {
     theme::badge(ui, protocol, theme::ACCENT, egui::Color32::WHITE);
-}
-
-fn detail_pair(ui: &mut egui::Ui, label: &str, value: &str, next_label: &str, next_value: &str) {
-    ui.label(egui::RichText::new(label).size(11.0).color(theme::MUTED));
-    ui.label(egui::RichText::new(value).size(12.0).strong());
-    ui.label(
-        egui::RichText::new(next_label)
-            .size(11.0)
-            .color(theme::MUTED),
-    );
-    ui.label(egui::RichText::new(next_value).size(12.0).strong());
 }
 
 fn compact_value(value: &str, max_chars: usize) -> String {

@@ -23,6 +23,14 @@ impl HistoryStore {
     pub fn load(enabled: bool) -> Self {
         let path = ProjectDirs::from("com", "SubLens", "SubLens")
             .map(|dirs| dirs.config_dir().join("history.bin"));
+        Self::load_with_path(enabled, path)
+    }
+
+    pub fn load_at(path: PathBuf, enabled: bool) -> Self {
+        Self::load_with_path(enabled, Some(path))
+    }
+
+    fn load_with_path(enabled: bool, path: Option<PathBuf>) -> Self {
         if !enabled {
             return Self {
                 enabled: false,
@@ -35,13 +43,20 @@ impl HistoryStore {
             .and_then(|path| fs::read(path).ok())
             .and_then(|bytes| platform::unprotect(&bytes).ok())
             .and_then(|bytes| serde_json::from_slice::<HistoryFile>(&bytes).ok())
-            .map(|history| history.urls)
+            .map(|mut history| {
+                history.urls.truncate(MAX_ENTRIES);
+                history.urls
+            })
             .unwrap_or_default();
         Self {
             enabled,
             path,
             urls,
         }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
     }
 
     pub fn urls(&self) -> &[String] {

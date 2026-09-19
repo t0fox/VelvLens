@@ -6,7 +6,7 @@ Approved architectural direction; implementation is intentionally not started un
 
 ## Goal
 
-SubLens is a local Windows desktop utility for inspecting proxy subscription and share URLs. It accepts an HTTP(S) source, follows safe recursive resolution rules, detects and decodes embedded content, extracts proxy URIs, parses them into a normalized model, displays a visual pipeline and configuration inspector, runs DNS/TCP connectivity checks, and exports results for v2rayN and other consumers.
+SubLens is a local Windows desktop utility for inspecting proxy subscription and share URLs. It accepts an HTTP(S) source, follows safe recursive resolution rules, detects and decodes embedded content, extracts proxy URIs, parses them into a normalized model, displays a visual pipeline and configuration inspector, runs DNS/TCP connectivity checks, and exports original configurations for local use.
 
 The product is a real utility, not a Base64 decoder or console proof-of-concept. It has no cloud backend, telemetry, analytics, or Electron runtime.
 
@@ -70,7 +70,7 @@ The core does not depend on `egui`. The UI consumes an `AnalysisReport` and does
 - `unknown_params` preserving unsupported query keys and values;
 - source and metadata such as depth, source URL, labels, exact duplicate count, and semantic duplicate key.
 
-Sensitive fields are never used directly for display. The UI asks the security module for redacted projections.
+Sensitive fields are available to the selected-configuration UI and explicit raw exports. The security module is used for redacted logs, previews, errors, and redirect displays.
 
 ### Analysis report
 
@@ -152,17 +152,17 @@ The main window is a compact dark utility interface optimized for 1920×1080:
 
 1. Header/input bar with subscription URL, Paste, Analyze, Cancel, Settings, and optional recent history.
 2. Pipeline strip showing HTTP → Decode → Extract → Parse with stage badges, progress, previews, counters, redirect chain, and errors.
-3. Filter/search row for All, protocol, Security, Transport, Working/Failed/Unknown, and duplicate handling.
+3. Filter/search row for All, protocol, Security, Transport, connectivity, and duplicate handling.
 4. Scrollable configuration card grid/list with protocol badge, name, endpoint, transport, security, SNI/fingerprint, status, latency, Copy, Details, QR, and Test actions.
-5. Inspector panel/modal for structured details, sanitized raw URI, raw URI reveal/copy, v2rayN export, and local QR display.
+5. Inspector panel/modal for structured details, exact raw URI copy, neutral raw export, and local QR display.
 
-UI state is derived from core results. Sensitive fields are masked by default and reveal is session-only. Long operations show progress and a working state while keeping controls responsive.
+UI state is derived from core results. Selected configuration fields are shown directly; there is no sensitive-reveal toggle or sanitized-copy action. Long operations show progress and a working state while keeping controls responsive.
 
 ## Privacy and security
 
 - No telemetry, analytics, cloud backend, or external QR service.
 - `redact_secret` is the centralized path for logs, previews, errors, redirect display, and diagnostics.
-- UUIDs, passwords, tokens, private keys, and sensitive query values are hidden by default.
+- UUIDs, passwords, tokens, private keys, and sensitive query values never enter application logs or diagnostic previews; the selected configuration view may show the actual parsed fields.
 - Raw subscription responses are held in memory and are never written automatically.
 - Clipboard writes happen only after an explicit user action.
 - History is disabled by default. When enabled, recent subscription URLs are stored locally using Windows DPAPI, with clear-history and disable-history controls. If protected storage is unavailable, history remains disabled rather than silently writing plaintext.
@@ -174,10 +174,10 @@ Exports consume normalized configurations but preserve each parser's original ra
 
 - selected raw URI;
 - all raw URIs, one per line;
-- v2rayN bulk URL clipboard output, one importable URI per line;
+- neutral raw URI clipboard/export output, one original URI per line;
 - `.txt` raw URI list;
 - Base64 subscription;
-- JSON normalized dump with sensitive fields masked unless explicitly requested;
+- JSON normalized dump through an explicit `include_sensitive` export parameter;
 - local QR generated from the raw URI using the Rust QR library and rendered in egui.
 
 ## Testing strategy

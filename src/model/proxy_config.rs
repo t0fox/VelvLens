@@ -9,17 +9,19 @@ pub enum Protocol {
     Vmess,
     Trojan,
     Shadowsocks,
+    Socks5,
     Hysteria2,
     Tuic,
     Unknown,
 }
 
 impl Protocol {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Vless,
         Self::Vmess,
         Self::Trojan,
         Self::Shadowsocks,
+        Self::Socks5,
         Self::Hysteria2,
         Self::Tuic,
         Self::Unknown,
@@ -31,6 +33,7 @@ impl Protocol {
             Self::Vmess => "VMess",
             Self::Trojan => "Trojan",
             Self::Shadowsocks => "Shadowsocks",
+            Self::Socks5 => "Socks5",
             Self::Hysteria2 => "Hysteria2",
             Self::Tuic => "TUIC",
             Self::Unknown => "Unknown",
@@ -98,6 +101,7 @@ pub struct ProxyConfig {
 
     pub host: String,
     pub port: u16,
+    pub port_range: Option<String>,
 
     pub uuid: Option<String>,
     pub username: Option<String>,
@@ -127,10 +131,11 @@ pub struct ProxyConfig {
 impl ProxyConfig {
     pub fn semantic_key(&self) -> String {
         let canonical = format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}",
             self.protocol.as_str(),
             self.host.to_ascii_lowercase(),
             self.port,
+            self.port_range.as_deref().unwrap_or_default(),
             self.security.as_str(),
             self.transport.as_str(),
             self.uuid.as_deref().unwrap_or_default(),

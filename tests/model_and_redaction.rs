@@ -10,6 +10,7 @@ fn fixture_config(name: &str, host: &str, port: u16) -> ProxyConfig {
         name: Some(name.to_owned()),
         host: host.to_owned(),
         port,
+        port_range: None,
         uuid: Some("12345678-1234-1234-1234-123456789abc".to_owned()),
         username: None,
         password: None,

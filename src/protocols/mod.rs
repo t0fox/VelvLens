@@ -1,6 +1,7 @@
 mod common;
 pub mod hysteria2;
 pub mod shadowsocks;
+pub mod socks5;
 pub mod trojan;
 pub mod tuic;
 pub mod vless;
@@ -17,7 +18,16 @@ pub fn is_supported_scheme(uri: &str) -> bool {
     uri.split_once("://").is_some_and(|(scheme, _)| {
         matches!(
             scheme.to_ascii_lowercase().as_str(),
-            "vless" | "vmess" | "trojan" | "ss" | "hysteria" | "hysteria2" | "hy2" | "tuic"
+            "vless"
+                | "vmess"
+                | "trojan"
+                | "ss"
+                | "socks"
+                | "socks5"
+                | "hysteria"
+                | "hysteria2"
+                | "hy2"
+                | "tuic"
         )
     })
 }
@@ -36,6 +46,7 @@ pub fn parse_uri(uri: &str, source: Option<&Url>, depth: u8) -> Result<ProxyConf
         "vmess" => vmess::parse(uri)?,
         "trojan" => trojan::parse(uri)?,
         "ss" => shadowsocks::parse(uri)?,
+        "socks" | "socks5" => socks5::parse(uri)?,
         "hysteria" | "hysteria2" | "hy2" => hysteria2::parse(uri)?,
         "tuic" => tuic::parse(uri)?,
         _ => parse_unknown(uri, source, depth, &scheme)?,

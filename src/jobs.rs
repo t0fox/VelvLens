@@ -9,13 +9,14 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     diagnostics::DiagnosticResult,
     model::ProxyConfig,
-    resolver::{AnalysisReport, Resolver, ResolverConfig},
+    resolver::{stage::PipelineStage, AnalysisReport, Resolver, ResolverConfig},
 };
 
 #[derive(Debug)]
 pub enum JobEvent {
     Started,
-    Completed(AnalysisReport),
+    Stage(PipelineStage),
+    Completed(Box<AnalysisReport>),
     Failed(String),
     Cancelled,
     DiagnosticCompleted(DiagnosticResult),
@@ -43,9 +44,15 @@ impl JobManager {
         self.runtime.spawn(async move {
             let _ = sender.send(JobEvent::Started);
             let resolver = Resolver::new(reqwest::Client::new(), config);
-            match resolver.analyze(&url, child.clone()).await {
+            let stage_sender = sender.clone();
+            match resolver
+                .analyze_with_stage_sink(&url, child.clone(), move |stage| {
+                    let _ = stage_sender.send(JobEvent::Stage(stage));
+                })
+                .await
+            {
                 Ok(report) => {
-                    let _ = sender.send(JobEvent::Completed(report));
+                    let _ = sender.send(JobEvent::Completed(Box::new(report)));
                 }
                 Err(crate::error::SubLensError::Cancelled) => {
                     let _ = sender.send(JobEvent::Cancelled);

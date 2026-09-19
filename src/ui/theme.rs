@@ -40,16 +40,21 @@ pub fn badge(ui: &mut egui::Ui, text: &str, fill: egui::Color32, color: egui::Co
         });
 }
 
-pub fn draw_logo(ui: &mut egui::Ui) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(36.0, 36.0), egui::Sense::hover());
+pub fn draw_logo(ui: &mut egui::Ui, size: f32) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, egui::Rounding::same(10.0), ACCENT);
-    let stroke = egui::Stroke::new(2.2_f32, egui::Color32::WHITE);
+    painter.rect_filled(rect, egui::Rounding::same(size * 0.27), ACCENT);
+    let stroke = egui::Stroke::new(size * 0.061, egui::Color32::WHITE);
     let center = rect.center();
-    painter.circle_stroke(center - egui::vec2(4.5, 3.5), 5.0, stroke);
-    painter.circle_stroke(center + egui::vec2(4.5, 3.5), 5.0, stroke);
+    let offset = size * 0.125;
+    let radius = size * 0.139;
+    painter.circle_stroke(center - egui::vec2(offset, size * 0.097), radius, stroke);
+    painter.circle_stroke(center + egui::vec2(offset, size * 0.097), radius, stroke);
     painter.line_segment(
-        [center - egui::vec2(1.5, 1.0), center + egui::vec2(1.5, 1.0)],
+        [
+            center - egui::vec2(size * 0.042, size * 0.028),
+            center + egui::vec2(size * 0.042, size * 0.028),
+        ],
         stroke,
     );
 }

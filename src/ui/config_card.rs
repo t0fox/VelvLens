@@ -16,8 +16,12 @@ pub fn show(
     selected: bool,
     selected_for_export: bool,
 ) -> CardResponse {
+    let port = config
+        .port_range
+        .clone()
+        .unwrap_or_else(|| config.port.to_string());
     let cursor = ui.cursor().min;
-    let card_rect = egui::Rect::from_min_size(cursor, egui::vec2(ui.available_width(), 80.0));
+    let card_rect = egui::Rect::from_min_size(cursor, egui::vec2(ui.available_width(), 68.0));
     let hovered = ui
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|position| card_rect.contains(position));
@@ -41,30 +45,36 @@ pub fn show(
         .fill(fill)
         .stroke(stroke)
         .rounding(egui::Rounding::same(10.0))
-        .inner_margin(egui::Margin::symmetric(12.0, 10.0))
+        .inner_margin(egui::Margin::symmetric(10.0, 5.0))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 protocol_mark(ui, config.protocol);
                 ui.add_space(6.0);
                 ui.vertical(|ui| {
-                    ui.label(
-                        egui::RichText::new(
-                            config.name.as_deref().unwrap_or("Unnamed configuration"),
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(
+                                config.name.as_deref().unwrap_or("Unnamed configuration"),
+                            )
+                            .size(13.0)
+                            .strong(),
                         )
-                        .size(13.0)
-                        .strong(),
+                        .truncate(),
                     );
-                    ui.label(
-                        egui::RichText::new(format!("{}:{}", config.host, config.port))
-                            .size(11.0)
-                            .color(theme::MUTED),
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(format!("{}:{port}", config.host))
+                                .size(10.0)
+                                .color(theme::MUTED),
+                        )
+                        .truncate(),
                     );
                 });
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                     if ui
                         .add_sized(
-                            [62.0, 26.0],
-                            egui::Button::new(egui::RichText::new("Details").size(10.0))
+                            [58.0, 22.0],
+                            egui::Button::new(egui::RichText::new("Details").size(9.5))
                                 .fill(theme::SURFACE_RAISED),
                         )
                         .clicked()
@@ -85,7 +95,7 @@ pub fn show(
                     }
                 });
             });
-            ui.add_space(6.0);
+            ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
                 theme::badge(
                     ui,
@@ -113,6 +123,13 @@ pub fn show(
         ui.id().with(("config-card", config.id.as_str())),
         egui::Sense::click(),
     );
+    if response.has_focus() {
+        ui.painter().rect_stroke(
+            frame_response.rect.expand(1.0),
+            egui::Rounding::same(10.0),
+            egui::Stroke::new(2.0_f32, theme::ACCENT_HOVER),
+        );
+    }
     CardResponse {
         clicked: response.clicked() || details_clicked,
         selection_toggled,
@@ -120,9 +137,9 @@ pub fn show(
 }
 
 fn protocol_mark(ui: &mut egui::Ui, protocol: Protocol) {
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(34.0, 34.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
-    painter.rect_filled(rect, egui::Rounding::same(9.0), protocol_fill(protocol));
+    painter.rect_filled(rect, egui::Rounding::same(8.0), protocol_fill(protocol));
     painter.text(
         rect.center(),
         egui::Align2::CENTER_CENTER,
@@ -138,6 +155,7 @@ fn protocol_fill(protocol: Protocol) -> egui::Color32 {
         Protocol::Vmess => egui::Color32::from_rgb(37, 99, 235),
         Protocol::Trojan => egui::Color32::from_rgb(234, 88, 12),
         Protocol::Shadowsocks => egui::Color32::from_rgb(14, 165, 164),
+        Protocol::Socks5 => egui::Color32::from_rgb(6, 182, 212),
         Protocol::Hysteria2 => egui::Color32::from_rgb(22, 163, 74),
         Protocol::Tuic => egui::Color32::from_rgb(219, 39, 119),
         Protocol::Unknown => egui::Color32::from_rgb(100, 116, 139),

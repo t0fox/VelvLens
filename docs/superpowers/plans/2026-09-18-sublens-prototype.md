@@ -318,7 +318,7 @@ git commit -m "feat: add bounded recursive subscription resolver"
 - Create: `src/export/raw.rs`
 - Create: `src/export/base64.rs`
 - Create: `src/export/json.rs`
-- Create: `src/export/v2rayn.rs`
+- No protocol-specific third-party export module; preserve original URI lines through the neutral raw exporter.
 - Create: `src/diagnostics/mod.rs`
 - Create: `src/diagnostics/dns.rs`
 - Create: `src/diagnostics/tcp.rs`
@@ -327,7 +327,7 @@ git commit -m "feat: add bounded recursive subscription resolver"
 
 **Interfaces:**
 - `export::raw_lines(configs: &[ProxyConfig]) -> String`.
-- `export::v2rayn_bulk(configs: &[ProxyConfig]) -> String`.
+- `export::raw_lines(configs: &[ProxyConfig]) -> String`.
 - `export::base64_subscription(configs: &[ProxyConfig]) -> String`.
 - `export::json_dump(configs: &[ProxyConfig], include_sensitive: bool) -> Result<String, SubLensError>`.
 - `diagnostics::check(config: &ProxyConfig, timeout: Duration, cancel: CancellationToken) -> DiagnosticResult`.
@@ -337,8 +337,8 @@ git commit -m "feat: add bounded recursive subscription resolver"
 
 ```rust
 #[test]
-fn v2rayn_export_is_line_oriented_and_preserves_unknown_params() {
-    let text = v2rayn_bulk(&[fixture_config_with_unknown_param()]);
+fn raw_export_is_line_oriented_and_preserves_unknown_params() {
+    let text = raw_lines(&[fixture_config_with_unknown_param()]);
     assert!(text.ends_with('\n'));
     assert!(text.contains("x-custom=value"));
 }
@@ -362,9 +362,9 @@ Run: `cargo test --test export_and_diagnostics`
 
 Expected: compilation failure because export, QR, and diagnostic interfaces do not exist.
 
-- [ ] **Step 3: Implement raw, v2rayN, Base64, and JSON exports**
+- [ ] **Step 3: Implement raw, Base64, and JSON exports**
 
-Raw and v2rayN output is one original URI per line with a trailing newline. Base64 export encodes that same line-oriented content with standard Base64. JSON export serializes normalized fields, masks secrets by default, and includes `unknown_params`, metadata, and protocol names.
+Raw output is one original URI per line with a trailing newline. Base64 export encodes that same line-oriented content with standard Base64. JSON export serializes normalized fields, preserves actual configuration values for explicit local export, and includes `unknown_params`, metadata, and protocol names.
 
 - [ ] **Step 4: Implement local QR matrix generation**
 
@@ -428,7 +428,7 @@ Configure a dark `Visuals` theme, 8/12/16 px spacing, rounded cards, compact sta
 
 - [ ] **Step 5: Implement cards, Inspector, filters, and copy actions**
 
-Cards read only `ProxyConfig` fields, mask credentials, show protocol/endpoint/security/transport/SNI/fingerprint/status/latency, and expose Copy, Details, QR, and Test buttons. Inspector shows the structured fields, redirect chain and stage list, masked raw URI, sanitized copy, and local QR. Use `arboard` only inside explicit button handlers.
+Cards read only `ProxyConfig` fields, show the actual parsed values required for inspection, and expose Copy, Details, QR, and Test buttons. Inspector shows the structured fields, redirect chain and stage list, the exact raw URI, and local QR. Redaction is limited to logs, previews, errors, and redirect displays. Use `arboard` only inside explicit button handlers.
 
 - [ ] **Step 6: Wire the native entry point and window behavior**
 
@@ -459,7 +459,7 @@ git commit -m "feat: add responsive SubLens desktop prototype"
 - Create: `tests/settings_and_history.rs`
 
 **Interfaces:**
-- `settings::AppSettings` with history disabled by default, resolver limits, timeout, and sensitive-display session flag.
+- `settings::AppSettings` with history disabled by default, resolver limits, and timeout.
 - `history::HistoryStore::{load, append, clear}`.
 - `platform::protect` and `platform::unprotect` behind Windows cfg, with a safe disabled fallback on non-Windows.
 
@@ -471,9 +471,9 @@ Assert default history is disabled, clear removes all entries, duplicate URLs ar
 
 On Windows use `CryptProtectData`/`CryptUnprotectData` through `windows-sys`, store only the encrypted history blob below the `directories` config directory, and fail closed if protection fails. On non-Windows or when DPAPI is unavailable, keep history disabled and in memory.
 
-- [ ] **Step 3: Add settings UI and session-only sensitive reveal**
+- [ ] **Step 3: Add settings UI**
 
-Expose history toggle, clear button, limits, timeout, and a session reset for sensitive visibility. Persist only non-secret settings in a small JSON file; never persist raw URI or revealed values in settings.
+Expose history toggle, clear button, limits, and timeout. Persist only non-secret settings in a small JSON file; never persist raw URI or parsed credential values in settings.
 
 - [ ] **Step 4: Run verification and commit**
 
@@ -508,7 +508,7 @@ Fetch only when explicitly invoked, use the normal resolver, and print sanitized
 
 - [ ] **Step 3: Add README and fixture documentation**
 
-Document supported protocols/formats, privacy guarantees, build/run commands, v2rayN import, QR/export behavior, diagnostics limitation, resolver limits, history behavior, known limitations, and include a screenshot only when a real screenshot is captured during acceptance.
+Document supported protocols/formats, privacy guarantees, build/run commands, QR/export behavior, diagnostics limitation, resolver limits, history behavior, known limitations, and include a screenshot only when a real screenshot is captured during acceptance.
 
 - [ ] **Step 4: Add CI workflow**
 

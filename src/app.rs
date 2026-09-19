@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -39,11 +39,14 @@ pub struct SubLensApp {
     show_export: bool,
     qr: Option<crate::qr::QrMatrix>,
     diagnostics: HashMap<usize, DiagnosticResult>,
+    copied_until: Option<Instant>,
 }
 
 impl SubLensApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         configure_style(&cc.egui_ctx);
+        let settings = AppSettings::load();
+        let history = HistoryStore::load(settings.history_enabled);
         Self {
             input: String::new(),
             status: "Ready · all analysis stays local".to_owned(),
@@ -60,12 +63,13 @@ impl SubLensApp {
             transport_filter: None,
             connectivity_filter: ConnectivityFilter::All,
             duplicate_filter: DuplicateFilter::All,
-            settings: AppSettings::default(),
-            history: HistoryStore::load(false),
+            settings,
+            history,
             show_settings: false,
             show_export: false,
             qr: None,
             diagnostics: HashMap::new(),
+            copied_until: None,
         }
     }
 
@@ -106,13 +110,16 @@ impl SubLensApp {
         while let Ok(event) = job.receiver.try_recv() {
             match event {
                 JobEvent::Started => self.status = "Fetching source…".to_owned(),
+                JobEvent::Stage(stage) => {
+                    self.status = format!("{:?} · {}", stage.kind, stage.preview);
+                }
                 JobEvent::Completed(report) => {
                     self.status = format!(
                         "HTTP complete · Decode complete · {} configurations found",
                         report.configs.len()
                     );
                     self.selected = report.configs.first().map(|_| 0);
-                    self.report = Some(report);
+                    self.report = Some(*report);
                     finished = true;
                 }
                 JobEvent::Failed(error) => {
@@ -154,7 +161,7 @@ impl SubLensApp {
                     self.status = "Connectivity check cancelled".to_owned();
                     finished = true;
                 }
-                JobEvent::Started | JobEvent::Completed(_) => {}
+                JobEvent::Started | JobEvent::Stage(_) | JobEvent::Completed(_) => {}
             }
         }
         if finished {
@@ -195,7 +202,20 @@ impl eframe::App for SubLensApp {
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
-                    if ui::settings::show(ui, &mut self.settings) {
+                    let settings_result = ui::settings::show(ui, &mut self.settings);
+                    if settings_result.history_toggled {
+                        self.history = HistoryStore::load(self.settings.history_enabled);
+                    }
+                    if settings_result.clear_history {
+                        self.history.clear();
+                        self.status = "Protected URL history cleared".to_owned();
+                    }
+                    if settings_result.changed {
+                        if let Err(error) = self.settings.save() {
+                            self.status = format!("Settings could not be saved: {error}");
+                        }
+                    }
+                    if settings_result.close {
                         self.show_settings = false;
                     }
                 });
@@ -208,6 +228,10 @@ impl eframe::App for SubLensApp {
                 .frame(theme::surface_frame(theme::SURFACE))
                 .show(ctx, |ui| {
                     if let Some(report) = &self.report {
+                        let has_json_payload = report
+                            .configs
+                            .iter()
+                            .any(|config| is_json_payload(&config.raw_uri));
                         ui.label(
                             egui::RichText::new(format!(
                                 "{} configurations · choose a local export",
@@ -220,7 +244,12 @@ impl eframe::App for SubLensApp {
                         if ui
                             .add_sized(
                                 [250.0, 34.0],
-                                egui::Button::new("Copy raw URI list").fill(theme::SURFACE_RAISED),
+                                egui::Button::new(if has_json_payload {
+                                    "Copy raw configuration payloads"
+                                } else {
+                                    "Copy raw URI list"
+                                })
+                                .fill(theme::SURFACE_RAISED),
                             )
                             .clicked()
                         {
@@ -228,25 +257,16 @@ impl eframe::App for SubLensApp {
                                 &report.configs,
                             ));
                         }
-                        if ui
-                            .add_sized(
-                                [250.0, 34.0],
-                                egui::Button::new("Copy for v2rayN").fill(theme::ACCENT),
-                            )
-                            .clicked()
-                        {
-                            ui::details::copy_to_clipboard(&crate::export::v2rayn_bulk(
-                                &report.configs,
-                            ));
-                        }
-                        if ui
-                            .add_sized(
-                                [250.0, 34.0],
-                                egui::Button::new("Copy Base64 subscription")
-                                    .fill(theme::SURFACE_RAISED),
-                            )
-                            .clicked()
-                        {
+                        let base64_export = ui.add_enabled(
+                            !has_json_payload,
+                            egui::Button::new(if has_json_payload {
+                                "Base64 unavailable for JSON"
+                            } else {
+                                "Copy Base64 subscription"
+                            })
+                            .fill(theme::SURFACE_RAISED),
+                        );
+                        if base64_export.clicked() {
                             ui::details::copy_to_clipboard(&crate::export::base64_subscription(
                                 &report.configs,
                             ));
@@ -254,12 +274,11 @@ impl eframe::App for SubLensApp {
                         if ui
                             .add_sized(
                                 [250.0, 34.0],
-                                egui::Button::new("Copy sanitized JSON")
-                                    .fill(theme::SURFACE_RAISED),
+                                egui::Button::new("Copy JSON").fill(theme::SURFACE_RAISED),
                             )
                             .clicked()
                         {
-                            if let Ok(json) = crate::export::json_dump(&report.configs, false) {
+                            if let Ok(json) = crate::export::json_dump(&report.configs, true) {
                                 ui::details::copy_to_clipboard(&json);
                             }
                         }
@@ -302,9 +321,9 @@ impl eframe::App for SubLensApp {
             &mut self.duplicate_filter,
             running,
             &self.status,
-            self.settings.show_sensitive_session,
             &mut self.qr,
             &self.diagnostics,
+            &mut self.copied_until,
         );
         if result.open_settings {
             self.show_settings = true;
@@ -325,7 +344,7 @@ impl eframe::App for SubLensApp {
         }
         if result.copy_all {
             if let Some(report) = &self.report {
-                ui::details::copy_to_clipboard(&crate::export::v2rayn_bulk(&report.configs));
+                ui::details::copy_to_clipboard(&crate::export::raw_lines(&report.configs));
             }
         }
         if result.copy_selected {
@@ -337,13 +356,13 @@ impl eframe::App for SubLensApp {
                     .filter(|(index, _)| self.selected_configs.contains(index))
                     .map(|(_, config)| config.clone())
                     .collect::<Vec<_>>();
-                ui::details::copy_to_clipboard(&crate::export::v2rayn_bulk(&configs));
+                ui::details::copy_to_clipboard(&crate::export::raw_lines(&configs));
             }
         }
     }
 }
 
-fn configure_style(ctx: &egui::Context) {
+pub fn configure_style(ctx: &egui::Context) {
     let mut visuals = egui::Visuals::dark();
     visuals.window_fill = theme::CANVAS;
     visuals.panel_fill = theme::CANVAS;
@@ -366,4 +385,8 @@ fn configure_style(ctx: &egui::Context) {
     style.spacing.button_padding = egui::vec2(12.0, 8.0);
     style.spacing.interact_size = egui::vec2(44.0, 34.0);
     ctx.set_style(style);
+}
+
+fn is_json_payload(raw: &str) -> bool {
+    matches!(raw.trim_start().chars().next(), Some('{') | Some('['))
 }

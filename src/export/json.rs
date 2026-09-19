@@ -20,29 +20,92 @@ pub fn json_dump(configs: &[ProxyConfig], include_sensitive: bool) -> Result<Str
 }
 
 fn redact_value(value: &mut Value) {
-    let Some(object) = value.as_object_mut() else {
-        return;
-    };
-    for key in ["uuid", "username", "password", "raw_uri"] {
-        if let Some(current) = object.get_mut(key) {
-            if let Some(text) = current.as_str() {
-                *current = Value::String(if key == "raw_uri" {
-                    redact_uri(text)
+    match value {
+        Value::Object(object) => {
+            for (key, current) in object.iter_mut() {
+                if key.eq_ignore_ascii_case("raw_uri") {
+                    if let Some(text) = current.as_str() {
+                        *current = Value::String(redact_raw_payload(text));
+                    }
+                } else if is_sensitive_key(key, current) {
+                    *current = Value::String("••••••".to_owned());
                 } else {
-                    "••••••".to_owned()
-                });
-            }
-        }
-    }
-    if let Some(unknown) = object.get_mut("unknown_params") {
-        if let Some(params) = unknown.as_object_mut() {
-            for key in [
-                "uuid", "password", "pass", "token", "pbk", "sid", "secret", "auth",
-            ] {
-                if let Some(values) = params.get_mut(key) {
-                    *values = Value::Array(vec![Value::String("••••••".to_owned())]);
+                    redact_value(current);
                 }
             }
         }
+        Value::Array(values) => {
+            for value in values {
+                redact_value(value);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
     }
+}
+
+fn redact_raw_payload(text: &str) -> String {
+    let trimmed = text.trim_start();
+    if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        if let Ok(mut value) = serde_json::from_str::<Value>(text) {
+            redact_json_payload(&mut value);
+            if let Ok(redacted) = serde_json::to_string(&value) {
+                return redacted;
+            }
+        }
+    }
+    redact_uri(text)
+}
+
+fn redact_json_payload(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            for (key, current) in object.iter_mut() {
+                if is_sensitive_key(key, current) {
+                    *current = Value::String("••••••".to_owned());
+                } else {
+                    redact_json_payload(current);
+                }
+            }
+        }
+        Value::Array(values) => {
+            for value in values {
+                redact_json_payload(value);
+            }
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
+fn is_sensitive_key(key: &str, value: &Value) -> bool {
+    let normalized = key
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect::<String>();
+    matches!(
+        normalized.as_str(),
+        "uuid"
+            | "username"
+            | "password"
+            | "pass"
+            | "token"
+            | "pbk"
+            | "sid"
+            | "secret"
+            | "auth"
+            | "privatekey"
+    ) || (normalized == "id" && value.as_str().is_some_and(looks_like_uuid))
+}
+
+fn looks_like_uuid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 36
+        && [8, 13, 18, 23]
+            .into_iter()
+            .all(|index| bytes[index] == b'-')
+        && bytes
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| ![8, 13, 18, 23].contains(index))
+            .all(|(_, character)| character.is_ascii_hexdigit())
 }

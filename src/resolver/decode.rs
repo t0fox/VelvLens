@@ -62,6 +62,8 @@ fn is_useful_decoded(text: &str) -> bool {
         || lower.contains("vmess://")
         || lower.contains("trojan://")
         || lower.contains("ss://")
+        || lower.contains("socks://")
+        || lower.contains("socks5://")
         || lower.contains("hysteria://")
         || lower.contains("hysteria2://")
         || lower.contains("hy2://")

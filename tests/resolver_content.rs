@@ -4,6 +4,7 @@ use base64::Engine;
 use sublens::resolver::decode::decode_candidates;
 use sublens::resolver::detect::{detect_content, ContentKind};
 use sublens::resolver::extract::extract_items;
+use sublens::resolver::metadata::parse_body_directives;
 
 #[test]
 fn decodes_standard_and_unpadded_url_safe_base64() {
@@ -63,6 +64,37 @@ fn detects_json_html_proxy_lists_and_base64_candidates() {
 }
 
 #[test]
+fn classifies_ready_made_xray_json_without_fabricating_a_uri() {
+    let json = include_bytes!("fixtures/ready_xray.json");
+    assert_eq!(
+        detect_content(json, Some("application/json")),
+        ContentKind::JsonConfiguration
+    );
+    let extracted = extract_items(
+        std::str::from_utf8(json).unwrap(),
+        ContentKind::JsonConfiguration,
+    );
+    assert!(extracted.proxy_uris.is_empty());
+}
+
+#[test]
+fn happ_style_fixture_keeps_metadata_and_all_supported_uri_families() {
+    let fixture = include_str!("fixtures/happ_formats.txt");
+    let metadata = parse_body_directives(fixture);
+    assert_eq!(metadata.profile_title.as_deref(), Some("Primary profile"));
+    let extracted = extract_items(fixture, ContentKind::ProxyList);
+    let protocols = extracted
+        .proxy_uris
+        .iter()
+        .filter_map(|uri| sublens::protocols::parse_uri(uri, None, 0).ok())
+        .map(|config| config.protocol)
+        .collect::<std::collections::HashSet<_>>();
+    assert!(protocols.contains(&sublens::model::Protocol::Socks5));
+    assert!(protocols.contains(&sublens::model::Protocol::Hysteria2));
+    assert!(protocols.contains(&sublens::model::Protocol::Vmess));
+}
+
+#[test]
 fn walks_nested_json_and_html_for_proxy_and_subscription_urls() {
     let json = include_str!("fixtures/nested.json");
     let result = extract_items(json, ContentKind::Json);
@@ -85,6 +117,14 @@ fn walks_nested_json_and_html_for_proxy_and_subscription_urls() {
         .nested_urls
         .iter()
         .any(|url| url.starts_with("https://")));
+}
+
+#[test]
+fn extracts_proxy_uris_from_arbitrary_html_data_attributes() {
+    let html = r#"<section data-config="hysteria2://synthetic-password@hy.example:443?sni=hy.example"></section>"#;
+    let result = extract_items(html, ContentKind::Html);
+    assert_eq!(result.proxy_uris.len(), 1);
+    assert!(result.proxy_uris[0].starts_with("hysteria2://"));
 }
 
 #[test]

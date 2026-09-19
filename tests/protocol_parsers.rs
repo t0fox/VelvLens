@@ -27,6 +27,7 @@ fn parses_all_required_schemes_without_crashing_on_extra_parameters() {
         &format!("vmess://{vmess_payload}"),
         "trojan://synthetic-password@example.net:443?security=tls",
         "ss://method:password@example.org:443",
+        "socks://user:password@example.org:1080",
         "hysteria2://synthetic-password@hy.example:443?sni=hy.example",
         "hysteria://hy.example:443?auth=synthetic-password&sni=hy.example",
         "tuic://12345678-1234-1234-1234-123456789abc:synthetic-password@tuic.example:443",
@@ -47,6 +48,35 @@ fn parses_all_required_schemes_without_crashing_on_extra_parameters() {
         legacy_hysteria.password.as_deref(),
         Some("synthetic-password")
     );
+}
+
+#[test]
+fn parses_happ_hysteria2_port_ranges_and_socks5_base64_credentials() {
+    let hysteria = parse_uri(
+        "hysteria2://synthetic-password@hy.example:443?port=1234,5000-6000,7044&sni=hy.example",
+        None,
+        0,
+    )
+    .unwrap();
+    assert_eq!(hysteria.protocol, Protocol::Hysteria2);
+    assert_eq!(hysteria.port, 1234);
+    assert_eq!(hysteria.port_range.as_deref(), Some("1234,5000-6000,7044"));
+
+    let credentials = STANDARD.encode("user:password");
+    let socks = parse_uri(
+        &format!("socks://{credentials}@socks.example:1080"),
+        None,
+        0,
+    )
+    .unwrap();
+    assert_eq!(socks.protocol, Protocol::Socks5);
+    assert_eq!(socks.username.as_deref(), Some("user"));
+    assert_eq!(socks.password.as_deref(), Some("password"));
+
+    let full = STANDARD.encode("user:password@socks.example:1080");
+    let socks = parse_uri(&format!("socks://{full}"), None, 0).unwrap();
+    assert_eq!(socks.host, "socks.example");
+    assert_eq!(socks.port, 1080);
 }
 
 #[test]

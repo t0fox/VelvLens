@@ -1,4 +1,5 @@
 /target/
+/artifacts/
 .rustup-init*.exe
 rustup-init*.exe
 *.local.json

@@ -128,6 +128,7 @@ pub fn finish(
         name,
         host,
         port,
+        port_range: None,
         uuid,
         username,
         password,
